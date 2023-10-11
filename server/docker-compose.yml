@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  rse_server:
+    build: .
+    container_name: rse_server
+    environment:
+        MYSQL_SERVER: 10.5.0.2
+        MYSQL_PORT: 3306
+        MYSQL_USERNAME: root
+        MYSQL_PASSWORD: toor
+    depends_on:
+      - 'database'
+    networks:
+      backend:
+        ipv4_address: 10.5.0.3
+  database:
+    image: mysql:8.1.0
+    restart: always
+    volumes:
+      - ./db:/var/lib/mysql
+    environment:
+        MYSQL_ROOT_PASSWORD: toor
+        MYSQL_DATABASE: rse
+    ports:
+      - 3306:3306
+    networks:
+      backend:
+        ipv4_address: 10.5.0.2
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
+          gateway: 10.5.0.1
