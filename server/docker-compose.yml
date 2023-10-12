@@ -2,11 +2,12 @@ version: '3.8'
 
 services:
   rse_server:
-    build: .
+    build: ./rse_server
     container_name: rse_server
     environment:
         MYSQL_SERVER: 10.5.0.2
         MYSQL_PORT: 3306
+        MYSQL_DATABASE: rse
         MYSQL_USERNAME: root
         MYSQL_PASSWORD: toor
     depends_on:
@@ -14,11 +15,21 @@ services:
     networks:
       backend:
         ipv4_address: 10.5.0.3
+  crawler:
+    build ./crawler
+    container_name: crawler
+    environment:
+        SEED_URLS_PATH: ./crawler/seed_urls.txt
+    depends_on:
+      - 'database'
+    networks:
+      backend:
+        ipv4_address: 10.5.0.4
   database:
     image: mysql:8.1.0
     restart: always
     volumes:
-      - ./db:/var/lib/mysql
+      - ./database/data:/var/lib/mysql
     environment:
         MYSQL_ROOT_PASSWORD: toor
         MYSQL_DATABASE: rse
