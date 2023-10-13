@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
-    "server",
+    "server/rse_server",
+    "server/rse_crawler",
     "client",
 ]
