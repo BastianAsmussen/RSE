@@ -1,5 +1,6 @@
 use std::env;
 use std::error::Error;
+use log::error;
 
 use mysql_async::Pool;
 
@@ -15,7 +16,7 @@ use mysql_async::Pool;
 /// - `MYSQL_DATABASE`
 /// - `MYSQL_USERNAME`
 /// - `MYSQL_PASSWORD`
-pub fn get_database_url() -> Result<String, Box<dyn Error>> {
+fn get_database_url() -> Result<String, Box<dyn Error>> {
     let server = env::var("MYSQL_SERVER")?;
     let port = env::var("MYSQL_PORT")?;
     let database = env::var("MYSQL_DATABASE")?;
@@ -29,16 +30,19 @@ pub fn get_database_url() -> Result<String, Box<dyn Error>> {
 
 /// Get a `Pool` for the database.
 ///
-/// # Arguments
-/// * `database_url`: A string slice representation of the databae URL.
-///
 /// # Returns
 /// * A `Result` containing either a `Pool` or an `Error` type.
 ///
 /// # Errors
 /// * The function will early return if it fails to establish a temporary connection to the database.
-pub async fn get_pool(database_url: &str) -> Result<Pool, Box<dyn Error>> {
-    let pool = Pool::new(database_url);
+pub async fn get_pool() -> Result<Pool, Box<dyn Error>> {
+    let Ok(database_url) = get_database_url() else {
+        error!("Missing environment variables!");
+
+        return Err("Missing environment variables!".into());
+    };
+
+    let pool = Pool::new(&*database_url);
 
     // Test the connection.
     let conn = pool.get_conn().await?;

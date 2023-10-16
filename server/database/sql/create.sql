@@ -3,7 +3,7 @@ USE rse;
 CREATE TABLE IF NOT EXISTS web_pages
 (
     id          INT AUTO_INCREMENT PRIMARY KEY,
-    url         VARCHAR(255) NOT NULL,
+    url         VARCHAR(2048) NOT NULL,
     title       VARCHAR(255),
     description TEXT,
     content     TEXT,

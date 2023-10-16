@@ -41,11 +41,7 @@ impl Metadata {
 
             return None;
         };
-        let Some(description) = get_description(document) else {
-            error!("No suitable description was found!");
-
-            return None;
-        };
+        let description = get_description(document).unwrap_or(String::new());
         let Some(keywords) = get_keywords(document) else {
             error!("Failed to find keywords!");
 
@@ -79,24 +75,22 @@ fn get_title(document: &Html) -> Option<String> {
 }
 
 fn get_description(document: &Html) -> Option<String> {
-    let Ok(selector) = Selector::parse("meta[name=description]") else {
+    let Ok(selector) = Selector::parse("description") else {
         error!("Failed to create description selector!");
 
         return None;
     };
 
     for element in document.select(&selector) {
-        let description = element.value().attr("content").unwrap_or_default();
+        let description = element.text().collect::<String>();
 
         // Check if the description is not empty.
         if !description.is_empty() {
-            return Some(description.to_string());
+            return Some(description);
         }
     }
 
     // If no non-empty description is found, return None.
-    warn!("No valid description was found!");
-
     None
 }
 
@@ -182,18 +176,100 @@ pub async fn index_pages(conn: &mut Conn, pages: &[Page]) -> Vec<Metadata> {
             continue;
         }
 
+        let url = page.get_url();
+        if url.len() > 2_048 {
+            warn!("URL is too long, skipping...");
+
+            continue;
+        }
+
         // If the database doesn't contain a copy of the page, insert it.
         let select_query = "SELECT id FROM web_pages WHERE url = ?";
         let result = conn
-            .exec_map(select_query, (page.get_url(),), |row: Row| {
+            .exec_map(select_query, (url,), |row: Row| {
                 // Extract the 'id' column from the result row
                 row.get_opt::<u32, &str>("id")
             })
             .await;
 
-        // The page exists in the database.
         if let Ok(id) = result {
-            let Some(Ok(id)) = id[0].clone() else {
+            if id.is_empty() {
+                let url = page.get_url();
+                if url.len() > 2_048 {
+                    warn!("URL is too long, skipping...");
+
+                    continue;
+                }
+
+                let html = page.get_html().replace('\n', "");
+                let html = if html.len() > 65_535 {
+                    warn!("HTML is too long, cutting...");
+
+                    html[..65_535].to_string()
+                } else {
+                    html
+                };
+
+                let insert_query = "INSERT INTO web_pages (url, title, description, content, timestamp) VALUES (?, ?, ?, ?, ?)";
+                let result = conn
+                    .exec_drop(
+                        insert_query,
+                        (url, &metadata.title, &metadata.description, html, time::get_ms_time()),
+                    )
+                    .await;
+
+                if let Err(err) = result {
+                    error!("Failed to insert the page: {}", err);
+
+                    continue;
+                }
+
+                let url = page.get_url();
+                if url.len() > 2_048 {
+                    warn!("URL is too long, skipping...");
+
+                    continue;
+                }
+
+                let select_query = "SELECT id FROM web_pages WHERE url = ?";
+                let result = conn
+                    .exec_map(select_query, (url,), |row: Row| {
+                        // Extract the 'id' column from the result row
+                        row.get_opt::<u32, &str>("id")
+                    })
+                    .await;
+
+                if let Ok(id) = result {
+                    if id.is_empty() {
+                        error!("Failed to get the ID of the page!");
+
+                        continue;
+                    }
+
+                    let Some(Some(Ok(id))) = id.first().cloned() else {
+                        error!("Failed to get the ID of the page!");
+
+                        continue;
+                    };
+
+                    let metadata = metadatas.pop().expect("Failed to pop metadata!");
+
+                    let keyword_query = "INSERT INTO keywords (page_id, keyword, frequency) VALUES (?, ?, ?)";
+                    for (keyword, frequency) in metadata.keywords {
+                        let result = conn
+                            .exec_drop(keyword_query, (id, keyword, frequency))
+                            .await;
+
+                        if let Err(err) = result {
+                            error!("Failed to insert the keyword: {}", err);
+                        }
+                    }
+                }
+                
+                continue;
+            }
+
+            let Some(Some(Ok(id))) = id.first().cloned() else {
                 error!("Failed to get the ID of the page!");
 
                 continue;
@@ -201,9 +277,18 @@ pub async fn index_pages(conn: &mut Conn, pages: &[Page]) -> Vec<Metadata> {
 
             let metadata = metadatas.pop().expect("Failed to pop metadata!");
 
-            let update_query = "UPDATE web_pages SET title = ?, description = ?, content = ?, last_updated = ? WHERE id = ?";
+            let html = page.get_html().replace('\n', "");
+            let html = if html.len() > 65_535 {
+                warn!("HTML is too long, cutting...");
+
+                html[..65_535].to_string()
+            } else {
+                html
+            };
+
+            let update_query = "UPDATE web_pages SET title = ?, description = ?, content = ?, timestamp = ? WHERE id = ?";
             let result = conn
-                .exec_drop(update_query, (&metadata.title, &metadata.description, page.get_html(), time::get_ms_time(), id))
+                .exec_drop(update_query, (&metadata.title, &metadata.description, html, time::get_ms_time(), id))
                 .await;
 
             if let Err(err) = result {
@@ -222,49 +307,6 @@ pub async fn index_pages(conn: &mut Conn, pages: &[Page]) -> Vec<Metadata> {
             }
 
             continue;
-        }
-        // The page doesn't exist in the database.
-        let insert_query = "INSERT INTO web_pages (url, title, description, content, last_updated) VALUES (?, ?, ?, ?, ?)";
-        let result = conn
-            .exec_drop(
-                insert_query,
-                (page.get_url(), &metadata.title, &metadata.description, page.get_html(), time::get_ms_time()),
-            )
-            .await;
-
-        if let Err(err) = result {
-            error!("Failed to insert the page: {}", err);
-
-            continue;
-        }
-
-        let select_query = "SELECT id FROM web_pages WHERE url = ?";
-        let result = conn
-            .exec_map(select_query, (page.get_url(),), |row: Row| {
-                // Extract the 'id' column from the result row
-                row.get_opt::<u32, &str>("id")
-            })
-            .await;
-
-        if let Ok(id) = result {
-            let Some(Ok(id)) = id[0].clone() else {
-                error!("Failed to get the ID of the page!");
-
-                continue;
-            };
-
-            let metadata = metadatas.pop().expect("Failed to pop metadata!");
-
-            let keyword_query = "INSERT INTO keywords (page_id, keyword, frequency) VALUES (?, ?, ?)";
-            for (keyword, frequency) in metadata.keywords {
-                let result = conn
-                    .exec_drop(keyword_query, (id, keyword, frequency))
-                    .await;
-
-                if let Err(err) = result {
-                    error!("Failed to insert the keyword: {}", err);
-                }
-            }
         }
     }
 
