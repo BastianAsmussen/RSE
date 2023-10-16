@@ -24,7 +24,7 @@ async fn main() -> std::io::Result<()> {
     let Ok(url) = get_database_url() else {
         panic!("Missing environment variables!");
     };
-    let Ok(pool) = get_pool(&url).await else {
+    let Ok(_pool) = get_pool(&url).await else {
         panic!("Failed to connect to the database!");
     };
 

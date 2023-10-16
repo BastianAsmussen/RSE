@@ -21,6 +21,7 @@ services:
     container_name: rse_crawler
     restart: always
     environment:
+        SEED_URLS: seed_urls.json
         MYSQL_SERVER: 10.5.0.2
         MYSQL_PORT: 3306
         MYSQL_DATABASE: rse

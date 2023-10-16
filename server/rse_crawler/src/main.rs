@@ -1,22 +1,28 @@
 mod utils;
-mod data;
-
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::{error, info, warn};
-use std::time::Instant;
-use mysql_async::params;
-use mysql_async::prelude::{BatchQuery, WithParams};
+
+use std::time::{Instant};
+
+use crate::utils::html::index_pages;
 
 use spider::tokio;
 use spider::website::Website;
 use utils::db_manager::{get_database_url, get_pool};
-
-const SEED_URLS: [&str; 1] = ["https://en.wikipedia.org"];
+use utils::seed_urls::get_seed_urls;
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
+
+    // Fetch seed URLs.
+    info!("Fetching seed URLs...");
+
+    let Some(seed_urls) = get_seed_urls() else {
+        panic!("Failed to fetch seed URLs!");
+    };
+
+    info!("Loaded {} seed URLs!", seed_urls.len());
 
     // Establish database connection.
     info!("Connecting to the database...");
@@ -33,21 +39,33 @@ async fn main() {
     // Crawl seed URLs.
     info!("Crawling seed URLs...");
 
-    for url in SEED_URLS {
+    for url in seed_urls {
         info!("Crawling {url}...");
 
-        let mut website: Website = Website::new("https://en.wikipedia.org");
-        website.with_respect_robots_txt(true)
+        let mut website: Website = Website::new(&url);
+        website
+            .with_respect_robots_txt(true)
             .with_subdomains(true)
             .with_tld(false)
             .with_delay(0)
             .with_request_timeout(None)
             .with_http2_prior_knowledge(false)
             .with_user_agent(Some("RSE Crawler"))
-            .with_budget(Some(spider::hashbrown::HashMap::from([("*", 300), ("/licenses", 10)])))
-            .with_external_domains(Some(Vec::from(["https://creativecommons.org/licenses/by/3.0/"].map(std::string::ToString::to_string)).into_iter()))
+            .with_budget(Some(spider::hashbrown::HashMap::from([
+                ("*", 300),
+                ("/licenses", 10),
+            ])))
+            .with_external_domains(Some(
+                Vec::from(
+                    ["https://creativecommons.org/licenses/by/3.0/"]
+                        .map(std::string::ToString::to_string),
+                )
+                .into_iter(),
+            ))
             .with_headers(None)
-            .with_blacklist_url(Some(Vec::from(["https://choosealicense.com/licenses/".into()])))
+            .with_blacklist_url(Some(Vec::from([
+                "https://choosealicense.com/licenses/".into()
+            ])))
             .with_proxies(None);
 
         let start = Instant::now();
@@ -55,15 +73,14 @@ async fn main() {
         let duration = start.elapsed();
 
         let Some(pages) = website.get_pages() else {
-            warn!("No pages were scraped for {url}!");
+            warn!("No pages found for {url}!");
 
             continue;
         };
 
         info!(
-            "Scraping {url} took {:?} for {:?} total pages.",
-            duration,
-            pages.len()
+            "Scraping {url} took {:?}, found {:?} total pages.",
+            duration, pages
         );
 
         let Ok(mut conn) = pool.get_conn().await else {
@@ -72,24 +89,10 @@ async fn main() {
             continue;
         };
 
-        let result =
-            r"INSERT INTO sites(url, is_accurate)
-              VALUES(:url, :is_accurate);
-              INSERT INTO data(site_id, last_updated, html)
-              VALUES(sites.LAST_INSERT_ID(), :last_updated, :html)"
-            .with(pages.clone().into_iter().map(|page| params ! {
-                "url" => page.get_url(),
-                "is_accurate" => 1,
-                "last_updated" => SystemTime::now()
-                                    .duration_since(UNIX_EPOCH)
-                                    .expect("Time went backwards!"),
-                "html" => page.get_html(),
-            }))
-            .batch(&mut conn)
-            .await;
+        info!("Indexing pages...");
 
-        if let Err(err) = result {
-            error!("Failed to insert sites into the database: {:?}", err);
-        }
+        let metadata = index_pages(&mut conn, pages).await;
+
+        info!("Indexed {} pages!", metadata.len());
     }
 }

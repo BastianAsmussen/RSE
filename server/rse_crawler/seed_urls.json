@@ -1,0 +1,74 @@
+{
+  "search_engines": [
+    "https://www.google.com/",
+    "https://www.bing.com/",
+    "https://www.yahoo.com/"
+  ],
+  "news_websites": [
+    "https://www.bbc.com/",
+    "https://www.nytimes.com/",
+    "https://www.cnn.com/",
+    "https://www.aljazeera.com/"
+  ],
+  "social_media_platforms": [
+    "https://www.facebook.com/",
+    "https://www.twitter.com/",
+    "https://www.instagram.com/",
+    "https://www.linkedin.com/"
+  ],
+  "academic_and_research_databases": [
+    "https://www.ncbi.nlm.nih.gov/",
+    "https://www.academia.edu/",
+    "https://scholar.google.com/"
+  ],
+  "e-commerce_websites": [
+    "https://www.amazon.com/",
+    "https://www.ebay.com/",
+    "https://www.walmart.com/"
+  ],
+  "government_websites": [
+    "https://www.usa.gov/",
+    "https://www.gov.uk/",
+    "https://www.australia.gov.au/"
+  ],
+  "blogs_and_personal_websites": [
+    "https://www.wordpress.com/",
+    "https://www.blogger.com/",
+    "https://medium.com/"
+  ],
+  "reference_websites": [
+    "https://www.wikipedia.org/",
+    "https://www.britannica.com/",
+    "https://www.dictionary.com/"
+  ],
+  "technology_news_and_forums": [
+    "https://www.techcrunch.com/",
+    "https://www.stackoverflow.com/",
+    "https://www.reddit.com/r/technology/"
+  ],
+  "educational_institutions": [
+    "https://www.harvard.edu/",
+    "https://www.mit.edu/",
+    "https://www.ox.ac.uk/"
+  ],
+  "open_data_repositories": [
+    "https://www.data.gov/",
+    "https://www.worldbank.org/",
+    "https://www.datahub.io/"
+  ],
+  "video_sharing_platforms": [
+    "https://www.youtube.com/",
+    "https://www.vimeo.com/",
+    "https://www.dailymotion.com/"
+  ],
+  "forums_and_community_sites": [
+    "https://www.reddit.com/",
+    "https://www.quora.com/",
+    "https://www.stackexchange.com/"
+  ],
+  "health_and_medical_websites": [
+    "https://www.webmd.com/",
+    "https://www.mayoclinic.org/",
+    "https://www.cdc.gov/"
+  ]
+}
