@@ -88,9 +88,8 @@ async fn main() {
 
                     indexed_pages.insert(url.to_string(), website.clone());
 
-                    info!("Data: {:#?}", pages.get(url).unwrap());
-
                     // TODO: Store pages in database.
+                    info!("Data: {:#?}", pages.get(url).unwrap());
                 }
             }
 
