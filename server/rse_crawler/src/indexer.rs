@@ -18,7 +18,7 @@ pub struct Data {
     pub title: Option<String>,
     pub description: Option<String>,
     pub keywords: Option<Vec<String>>,
-    pub outbound_links: Option<Vec<String>>,
+    pub outbound_links: Vec<String>,
 }
 
 impl Data {
@@ -35,14 +35,14 @@ impl Data {
         title: Option<&str>,
         description: Option<&str>,
         keywords: Option<&[String]>,
-        outbound_links: Option<&[String]>,
+        outbound_links: &[String],
     ) -> Self {
         Self {
             url: url.to_string(),
             title: title.map(std::string::ToString::to_string),
             description: description.map(std::string::ToString::to_string),
             keywords: keywords.map(<[String]>::to_vec),
-            outbound_links: outbound_links.map(<[String]>::to_vec),
+            outbound_links: outbound_links.to_vec(),
         }
     }
 }
@@ -94,7 +94,7 @@ pub fn scrape(website: &Website) -> HashMap<String, Data> {
             title.as_deref(),
             description.as_deref(),
             keywords.as_deref(),
-            outbound_links.as_deref(),
+            &outbound_links,
         );
 
         page_data.insert(url.to_string(), data);
@@ -190,6 +190,7 @@ fn get_keywords(document: &Html) -> Option<Vec<String>> {
         .map(|keywords| {
             keywords
                 .split(',')
+                .map(str::trim)
                 .map(std::string::ToString::to_string)
                 .collect()
         })
@@ -207,22 +208,21 @@ fn get_keywords(document: &Html) -> Option<Vec<String>> {
 /// * If the selector fails to parse the links selector.
 /// * If the selector fails to select an element from the document.
 /// * If the selector fails to get the href attribute of the element.
-fn get_links(document: &Html) -> Option<Vec<String>> {
+fn get_links(document: &Html) -> Vec<String> {
     let selector = match Selector::parse("a") {
         Ok(selector) => selector,
         Err(e) => {
             error!("Failed to parse links selector! (Error: {e})");
 
-            return None;
+            return vec![];
         }
     };
 
-    Some(
-        document
-            .select(&selector)
-            .map(|element| element.value().attr("href"))
-            .filter(Option::is_some)
-            .map(|href| href.expect("Failed to get href attribute!").to_string())
-            .collect::<Vec<String>>(),
-    )
+    document
+        .select(&selector)
+        .map(|element| element.value().attr("href"))
+        .filter(Option::is_some)
+        .map(|href| href.expect("Failed to get href attribute!").to_string())
+        .filter(|href| href.starts_with("http://") || href.starts_with("https://"))
+        .collect::<Vec<String>>()
 }
