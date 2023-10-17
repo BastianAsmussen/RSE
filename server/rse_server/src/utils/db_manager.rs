@@ -1,6 +1,6 @@
+use log::error;
 use std::env;
 use std::error::Error;
-use log::error;
 
 use mysql_async::Pool;
 

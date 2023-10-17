@@ -22,6 +22,7 @@ services:
     restart: always
     environment:
         SEED_URLS: seed_urls.json
+        WORKER_THREADS: 4
         MYSQL_SERVER: 10.5.0.2
         MYSQL_PORT: 3306
         MYSQL_DATABASE: rse
@@ -34,6 +35,7 @@ services:
         ipv4_address: 10.5.0.4
   database:
     image: mysql:8.1.0
+    container_name: rse_database
     restart: always
     volumes:
       - ./database/storage:/var/lib/mysql

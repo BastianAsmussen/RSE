@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::error::Error;
 
 use serde_yaml::Value;
 
@@ -96,7 +97,7 @@ impl<'a> SeedURLReader<'a> {
     fn read_seed_urls_from_file<T>(
         &self,
         file_path: T,
-    ) -> Result<Option<Vec<String>>, Box<dyn std::error::Error>>
+    ) -> Result<Option<Vec<String>>, Box<dyn Error>>
     where
         T: AsRef<Path>,
     {
@@ -115,8 +116,8 @@ impl<'a> SeedURLReader<'a> {
 ///
 /// # Returns
 ///
-/// * An `Option` contianing either `Some(Vec<String>)` or `None`.
-pub fn get_seed_urls() -> Option<Vec<String>> {
+/// * An `Option` containing either `Some(Vec<String>)` or `None`.
+pub fn fetch() -> Option<Vec<String>> {
     // Load the file path from the environment variable.
     let Ok(file_path) = std::env::var_os("SEED_URLS")?.into_string() else {
         error!("Failed to parse seed URLs path to string!");
@@ -127,11 +128,7 @@ pub fn get_seed_urls() -> Option<Vec<String>> {
 
     // Define the reader.
     let path = Path::new(&file_path);
-    let Some(extension) = path.extension() else {
-        error!("Failed to get file extension!");
-
-        return None;
-    };
+    let extension = path.extension()?;
     let reader = match extension.to_str() {
         Some("json") => {
             info!("Using JSON strategy for seed URL reader...");
