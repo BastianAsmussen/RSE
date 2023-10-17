@@ -10,3 +10,4 @@ env_logger = "0.10.0"
 mysql_async = "0.32.2"
 
 actix-web = "4.4.0"
+serde = { version = "1.0.189", features = ["derive"] }
