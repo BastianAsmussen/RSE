@@ -77,7 +77,8 @@ async fn main() {
     // Index crawled websites.
     info!("Indexing crawled websites...");
 
-    let (time, indexed_pages) = timer.time(|| async {
+    let (time, indexed_pages) = timer
+        .time(|| async {
             info!("Indexing crawled websites...");
 
             let mut indexed_pages = HashMap::new();
@@ -94,7 +95,8 @@ async fn main() {
             }
 
             indexed_pages
-        }).await;
+        })
+        .await;
 
     info!(
         "Indexed {} pages in {}!",
