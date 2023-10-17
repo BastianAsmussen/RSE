@@ -1,15 +1,14 @@
 mod utils;
 
-use actix_web::{get, HttpRequest, web};
+use actix_web::get;
+use actix_web::web::Path;
 use actix_web::App;
 use actix_web::HttpResponse;
 use actix_web::HttpServer;
 use actix_web::Responder;
-use actix_web::web::Path;
 use log::{error, info};
-use mysql_async::{Params, Pool};
 
-use utils::db_manager::{get_pool};
+use utils::db_manager::get_pool;
 
 #[get("/")]
 async fn root() -> impl Responder {
@@ -24,7 +23,7 @@ async fn query(path: Path<String>) -> impl Responder {
         return HttpResponse::InternalServerError().body("Failed to connect to the database!");
     };
 
-    let Ok(conn) = pool.get_conn().await else {
+    let Ok(_conn) = pool.get_conn().await else {
         error!("Failed to get a connection from the pool!");
 
         return HttpResponse::InternalServerError().body("Failed to connect to the database!");
