@@ -5,29 +5,24 @@ services:
     build: ./rse_server
     container_name: rse_server
     restart: always
-    environment:
-        MYSQL_SERVER: 10.5.0.2
-        MYSQL_PORT: 3306
-        MYSQL_DATABASE: rse
-        MYSQL_USERNAME: root
-        MYSQL_PASSWORD: toor
+    env_file: ../.env
     depends_on:
       - 'database'
+    ports:
+      - '80:8080'
     networks:
       backend:
         ipv4_address: 10.5.0.3
+      frontend:
   rse_crawler:
     build: ./rse_crawler
     container_name: rse_crawler
     restart: always
     environment:
-        SEED_URLS: seed_urls.json
-        WORKER_THREADS: 4
-        MYSQL_SERVER: 10.5.0.2
-        MYSQL_PORT: 3306
-        MYSQL_DATABASE: rse
-        MYSQL_USERNAME: root
-        MYSQL_PASSWORD: toor
+      SEED_URLS: seed_urls.json
+      WORKER_THREADS: 4
+      MAX_CRAWL_DEPTH: 2
+    env_file: ../.env
     depends_on:
       - 'database'
     networks:
@@ -40,10 +35,10 @@ services:
     volumes:
       - ./database/storage:/var/lib/mysql
     environment:
-        MYSQL_ROOT_PASSWORD: toor
-        MYSQL_DATABASE: rse
+      MYSQL_ROOT_PASSWORD: toor
+      MYSQL_DATABASE: rse
     ports:
-      - "3306:3306"
+      - '3306:3306'
     networks:
       backend:
         ipv4_address: 10.5.0.2
@@ -55,3 +50,5 @@ networks:
       config:
         - subnet: 10.5.0.0/16
           gateway: 10.5.0.1
+  frontend:
+    driver: bridge

@@ -1,10 +1,14 @@
-FROM rust:1.73
+ARG BINARY_NAME=rse_server
 
-WORKDIR /usr/bin/rse_server
+FROM rust:latest
+ARG BINARY_NAME
+
+WORKDIR /usr/src/${BINARY_NAME}
 COPY . .
 
 RUN cargo install --path .
 
 ENV RUST_LOG=INFO
+CMD ["rse_server"]
 
-CMD [ "rse_server" ]
+EXPOSE 8080

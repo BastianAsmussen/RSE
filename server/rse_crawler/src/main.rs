@@ -2,12 +2,11 @@ mod crawler;
 mod indexer;
 mod utils;
 
+use crate::utils::db::model::Page;
 use log::{error, info};
-use std::collections::HashMap;
 
-use crate::utils::seed_urls;
+use crate::utils::env::seed_urls;
 use crate::utils::timer::{format_time, Timer};
-use spider::tokio;
 
 #[tokio::main]
 async fn main() {
@@ -29,70 +28,47 @@ async fn main() {
     // Crawl seed URLs.
     info!("Crawling seed URLs...");
 
-    let mut websites = Vec::new();
+    // Split the seed URLs over the number of worker threads.
+    let url_chunks = seed_urls
+        .chunks(utils::env::crawler::get_worker_threads())
+        .map(|url_chunk| url_chunk.join("\n"))
+        .collect::<Vec<String>>();
 
-    let crawl = async {
-        let chunks = seed_urls
-            .chunks(utils::get_worker_threads())
-            .map(|chunk| chunk.join("\n"));
-        for chunk in chunks {
-            let chunk_websites = match tokio::spawn(async move {
-                let mut websites = Vec::new();
-                for url in chunk.split('\n') {
-                    let website = match crawler::crawl(url).await {
-                        Ok(website) => website,
-                        Err(e) => {
-                            error!("Failed to crawl seed URL {url}! (Error: {e})");
+    // Create a channel to send the crawled URLs over.
+    let (send, mut recv) = tokio::sync::mpsc::channel::<Vec<Page>>(url_chunks.len());
+    for url_chunk in url_chunks {
+        let send = send.clone();
+        rayon::spawn(move || {
+            let mut pages_chunk = Vec::new();
 
-                            continue;
-                        }
-                    };
-
-                    info!("Crawled seed URL {url}!");
-
-                    websites.push(website.clone());
-
-                    // Index crawled websites.
-                    info!("Indexing crawled websites...");
-
-                    let mut indexed_pages = HashMap::new();
-                    let pages = indexer::scrape(&website);
-                    for url in pages.keys() {
-                        info!("Indexed page {url}!");
-
-                        indexed_pages.insert(url.to_string(), website.clone());
-
-                        // TODO: Store pages in database.
-                        info!("{:#?}", pages.get(url).unwrap());
-                    }
-
-                    info!(
-                        "Indexed {} pages in {}!",
-                        indexed_pages.len(),
-                        format_time(&time)
-                    );
+            for url in url_chunk.lines() {
+                if let Err(e) = crawler::crawl_url(
+                    &mut pages_chunk,
+                    url,
+                    utils::env::crawler::get_max_crawl_depth(),
+                    0,
+                ) {
+                    error!("Failed to crawl URL: {}", e);
                 }
+            }
 
-                websites
-            })
-            .await
-            {
-                Ok(websites) => websites,
-                Err(e) => {
-                    error!("Failed to crawl seed URLs (Error: {e})");
+            if let Err(e) = send.blocking_send(pages_chunk) {
+                error!("Failed to send crawled URLs: {}", e);
+            }
+        });
+    }
 
-                    continue;
-                }
-            };
+    let (time, pages) = timer
+        .time(|| async {
+            let mut pages = Vec::new();
 
-            websites.extend(chunk_websites);
-        }
-    };
+            while let Some(pages_chunk) = recv.recv().await {
+                pages.extend(pages_chunk);
+            }
 
-    let (time, ()) = timer.time(|| crawl).await;
-    info!(
-        "Crawled {} seed URLs in {}!",
-        websites.len(),
-        format_time(&time)
-    );
+            pages
+        })
+        .await;
+
+    info!("Crawled {} URLs in {}!", pages.len(), format_time(&time));
 }
