@@ -1,7 +1,22 @@
-use crate::indexer;
 use crate::utils::db::model::{ForwardLink, Keyword, Page};
 use log::info;
+use rust_stemmers::{Algorithm, Stemmer};
 use scraper::{error::SelectorErrorKind, Html, Selector};
+use std::collections::HashMap;
+
+/// A website is a page with keywords and forward links.
+///
+/// # Fields
+///
+/// * `page` - The page of the website.
+/// * `keywords` - The keywords of the website.
+/// * `forward_links` - The forward links of the website.
+#[derive(Debug)]
+pub struct Website {
+    pub page: Page,
+    pub keywords: Vec<Keyword>,
+    pub forward_links: Option<Vec<ForwardLink>>,
+}
 
 /// Crawl a given URL and the URLs it links to, to a certain depth.
 ///
@@ -15,7 +30,7 @@ use scraper::{error::SelectorErrorKind, Html, Selector};
 ///
 /// * `Ok(())` if the crawling was successful, otherwise an `Err`.
 pub fn crawl_url(
-    output: &mut Vec<Page>,
+    output: &mut Vec<Website>,
     url: &str,
     max_depth: usize,
     current_depth: usize,
@@ -40,7 +55,14 @@ pub fn crawl_url(
         title,
         description,
     };
-    output.push(page);
+
+    let website = Website {
+        page,
+        keywords,
+        forward_links: forward_links.clone(),
+    };
+
+    output.push(website);
 
     if let Some(links) = forward_links {
         for link in links {
@@ -63,7 +85,7 @@ pub fn crawl_url(
 ///
 /// * `Ok(())` if the crawling was successful, otherwise an `Err`.
 pub fn crawl_urls(
-    output: &mut Vec<Page>,
+    output: &mut Vec<Website>,
     urls: Vec<&str>,
     max_depth: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -89,7 +111,7 @@ pub fn crawl_urls(
 /// * If the selector fails to parse the title selector.
 /// * If the selector fails to select an element from the document.
 /// * If the selector fails to get the inner HTML of the element.
-fn get_title(document: &Html) -> Result<Option<String>, SelectorErrorKind<'static>> {
+pub fn get_title(document: &Html) -> Result<Option<String>, SelectorErrorKind<'static>> {
     let selector = Selector::parse("title")?;
 
     Ok(document
@@ -113,7 +135,7 @@ fn get_title(document: &Html) -> Result<Option<String>, SelectorErrorKind<'stati
 /// * If the selector fails to parse the description selector.
 /// * If the selector fails to select an element from the document.
 /// * If the selector fails to get the content of the element.
-fn get_description(document: &Html) -> Result<Option<String>, SelectorErrorKind<'static>> {
+pub fn get_description(document: &Html) -> Result<Option<String>, SelectorErrorKind<'static>> {
     let selector = Selector::parse("meta[name=description]")?;
 
     Ok(document
@@ -139,10 +161,10 @@ fn get_description(document: &Html) -> Result<Option<String>, SelectorErrorKind<
 /// * If the selector fails to select an element from the document.
 /// * If the selector fails to get the content of the element.
 /// * If the keywords fail to split.
-fn get_keywords(document: &Html) -> Result<Option<Vec<Keyword>>, SelectorErrorKind<'static>> {
+pub fn get_keywords(document: &Html) -> Result<Vec<Keyword>, Box<dyn std::error::Error>> {
     let selector = Selector::parse("meta[name=keywords]")?;
 
-    let keywords = document
+    let mut keywords = document
         .select(&selector)
         .next()
         .and_then(|element| element.value().attr("content"))
@@ -154,14 +176,88 @@ fn get_keywords(document: &Html) -> Result<Option<Vec<Keyword>>, SelectorErrorKi
                 .collect::<Vec<String>>()
         });
 
-    /*
-     TODO:
-     - Remove stop words from the keywords.
-     - Stem the keywords.
-     - Count the frequency of the keywords.
-     */
+    // Filter the keywords.
+    Ok(if let Some(keywords) = &mut keywords {
+        // Remove stop words from the keywords.
+        remove_stop_words(keywords)?;
+        // Stem the keywords.
+        stem_keywords(keywords);
+        // Convert the keywords to a list of keywords with their frequency.
+        to_keywords(keywords)
+    } else {
+        Vec::new()
+    })
+}
 
-    Ok(_)
+/// Removes stop words from a list of keywords.
+///
+/// # Arguments
+///
+/// * `keywords` - The keywords to remove the stop words from.
+///
+/// # Returns
+///
+/// * Either `Ok(())`, or an `Err`.
+///
+/// # Errors
+///
+/// * If the stop words file fails to read.
+/// * If the stop words file fails to parse.
+///
+/// # Notes
+///
+/// * The stop words file is located at `stop_words.txt`.
+fn remove_stop_words(keywords: &mut Vec<String>) -> Result<(), std::io::Error> {
+    let stop_words = std::fs::read_to_string("stop_words.txt")?;
+    stop_words
+        .lines()
+        .for_each(|stop_word| keywords.retain(|keyword| keyword != stop_word));
+
+    Ok(())
+}
+
+/// Stems a list of keywords.
+///
+/// # Arguments
+///
+/// * `keywords` - The keywords to stem.Vec
+fn stem_keywords(keywords: &mut [String]) {
+    let stemmer = Stemmer::create(Algorithm::English);
+
+    keywords
+        .iter_mut()
+        .for_each(|keyword| *keyword = stemmer.stem(keyword).to_string());
+}
+
+/// Converts a list of strings to a list of keywords with their frequency.
+///
+/// # Arguments
+///
+/// * `keywords` - The keywords to convert.
+///
+/// # Returns
+///
+/// * A list of keywords with their frequency.
+///
+/// # Notes
+///
+/// * The frequency of a keyword is the amount of times it occurs in the list.
+fn to_keywords(keywords: &[String]) -> Vec<Keyword> {
+    let mut output = HashMap::new();
+
+    for keyword in keywords {
+        let frequency = output.entry(keyword).or_insert(0);
+
+        *frequency += 1;
+    }
+
+    output
+        .iter()
+        .map(|(keyword, frequency)| Keyword {
+            keyword: (*keyword).to_string(),
+            frequency: *frequency,
+        })
+        .collect()
 }
 
 /// Gets the links of a page.
@@ -179,7 +275,7 @@ fn get_keywords(document: &Html) -> Result<Option<Vec<Keyword>>, SelectorErrorKi
 /// * If the selector fails to parse the links selector.
 /// * If the selector fails to select an element from the document.
 /// * If the selector fails to get the href attribute of the element.
-fn get_links(document: &Html) -> Result<Option<Vec<ForwardLink>>, SelectorErrorKind<'static>> {
+pub fn get_links(document: &Html) -> Result<Option<Vec<ForwardLink>>, SelectorErrorKind<'static>> {
     let selector = Selector::parse("a")?;
 
     let links = Some(
@@ -192,7 +288,26 @@ fn get_links(document: &Html) -> Result<Option<Vec<ForwardLink>>, SelectorErrorK
             .collect::<Vec<String>>(),
     );
 
+    Ok(to_forward_links(&links))
+}
 
-
-    Ok()
+/// Converts a list of strings to a list of forward links.
+///
+/// # Arguments
+///
+/// * `links` - The links to convert.
+///
+/// # Returns
+///
+/// * Either `Some(Vec)`, or `None`.
+fn to_forward_links(links: &Option<Vec<String>>) -> Option<Vec<ForwardLink>> {
+    Some(
+        links
+            .as_ref()?
+            .iter()
+            .map(|link| ForwardLink {
+                url: link.to_string(),
+            })
+            .collect(),
+    )
 }

@@ -28,3 +28,12 @@ num_cpus = "1.16.0"
 reqwest = { version = "0.11.22", features = ["blocking"] }
 scraper = "0.17.1"
 rayon = "1.8.0"
+rust-stemmers = "1.2.0"
+
+# Spider
+spider = { version = "1.46.3", features = ["budget"] } #, "decentralized"] }
+#spider_worker = { version = "1.46.3", features = ["full_resources"] }
+async-recursion = "1.0.5"
+
+[dev-dependencies]
+color-eyre = "0.6.2"
