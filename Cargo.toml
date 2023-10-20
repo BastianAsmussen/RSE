@@ -4,5 +4,4 @@ resolver = "2"
 members = [
     "server/rse_server",
     "server/rse_crawler",
-    "client",
 ]
