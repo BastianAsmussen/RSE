@@ -1,8 +1,8 @@
 mod crawler;
 mod indexer;
+mod spider;
 mod utils;
 
-use crate::utils::db::model::Page;
 use log::{error, info};
 
 use crate::utils::env::seed_urls;
@@ -28,6 +28,26 @@ async fn main() {
     // Crawl seed URLs.
     info!("Crawling seed URLs...");
 
+    let mut websites = Vec::new();
+
+    for url in seed_urls {
+        info!("Crawling seed URL (\"{url}\")...");
+
+        let new_websites = match spider::crawl_url(&url, 0).await {
+            Ok(new_websites) => new_websites,
+            Err(why) => {
+                error!("Failed to crawl seed URL (\"{url}\"): {why}!");
+
+                continue;
+            }
+        };
+
+        websites.extend(new_websites);
+    }
+
+    info!("Crawled {} URLs.", websites.len());
+
+    /*
     // Split the seed URLs over the number of worker threads.
     let url_chunks = seed_urls
         .chunks(utils::env::crawler::get_worker_threads())
@@ -35,15 +55,15 @@ async fn main() {
         .collect::<Vec<String>>();
 
     // Create a channel to send the crawled URLs over.
-    let (send, mut recv) = tokio::sync::mpsc::channel::<Vec<Page>>(url_chunks.len());
+    let (sender, mut receiver) = tokio::sync::mpsc::channel::<Vec<Website>>(url_chunks.len());
     for url_chunk in url_chunks {
-        let send = send.clone();
+        let sender = sender.clone();
         rayon::spawn(move || {
-            let mut pages_chunk = Vec::new();
+            let mut websites_chunk = Vec::new();
 
             for url in url_chunk.lines() {
                 if let Err(e) = crawler::crawl_url(
-                    &mut pages_chunk,
+                    &mut websites_chunk,
                     url,
                     utils::env::crawler::get_max_crawl_depth(),
                     0,
@@ -52,23 +72,67 @@ async fn main() {
                 }
             }
 
-            if let Err(e) = send.blocking_send(pages_chunk) {
+            if let Err(e) = sender.blocking_send(websites_chunk) {
                 error!("Failed to send crawled URLs: {}", e);
             }
         });
     }
 
-    let (time, pages) = timer
+    let (time, websites) = timer
         .time(|| async {
-            let mut pages = Vec::new();
+            let mut websites = Vec::new();
 
-            while let Some(pages_chunk) = recv.recv().await {
-                pages.extend(pages_chunk);
+            while let Some(websites_chunk) = receiver.recv().await {
+                websites.extend(websites_chunk);
             }
 
-            pages
+            websites
         })
         .await;
 
-    info!("Crawled {} URLs in {}!", pages.len(), format_time(&time));
+    info!("Crawled {} URLs in {}!", websites.len(), format_time(&time));
+
+    // Index crawled URLs.
+    info!("Indexing crawled URLs...");
+
+    let mut conn = match utils::env::database::establish_connection().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            error!("Failed to establish database connection: {}", e);
+
+            return;
+        }
+    };
+
+    let (time, ()) = timer
+        .time(|| async {
+            for website in &websites {
+                match indexer::create_page(&mut conn, &website.page).await {
+                    Ok(()) => (),
+                    Err(e) => error!("Failed to index page: {}", e),
+                }
+
+                if let Some(links) = &website.forward_links {
+                    for link in links {
+                        match indexer::create_forward_link(&mut conn, link).await {
+                            Ok(()) => (),
+                            Err(e) => error!("Failed to index link: {}", e),
+                        }
+                    }
+                } else {
+                    warn!("No forward links found for page: {}", website.page.url);
+                };
+
+                for keyword in &website.keywords {
+                    match indexer::create_keyword(&mut conn, keyword).await {
+                        Ok(()) => (),
+                        Err(e) => error!("Failed to index keyword: {}", e),
+                    }
+                }
+            }
+        })
+        .await;
+
+    info!("Indexed {} URLs in {}!", websites.len(), format_time(&time));
+     */
 }
