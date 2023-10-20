@@ -10,7 +10,7 @@ use diesel_async::{AsyncConnection, AsyncMysqlConnection};
 /// # Notes
 ///
 /// * If the `DATABASE_URL` environment variable isn't set, the program will panic.
-/// * The database URL is expected to be a valid MySQL URL.
+/// * The database URL is expected to be a valid `MySQL` URL.
 pub fn get_database_url() -> String {
     std::env::var_os("DATABASE_URL")
         .expect("DATABASE_URL must be set")
@@ -28,8 +28,8 @@ pub fn get_database_url() -> String {
 /// # Notes
 ///
 /// * If the `DATABASE_URL` environment variable isn't set, the program will panic.
-/// * The database URL is expected to be a valid MySQL URL.
-/// * The database connection is expected to be a valid MySQL connection.
+/// * The database URL is expected to be a valid `MySQL` URL.
+/// * The database connection is expected to be a valid `MySQL` connection.
 pub async fn establish_connection() -> ConnectionResult<AsyncMysqlConnection> {
     let database_url = get_database_url();
 
