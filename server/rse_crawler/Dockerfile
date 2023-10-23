@@ -8,5 +8,5 @@ COPY . .
 
 RUN cargo install --path .
 
-ENV RUST_LOG=rse_crawler
+ENV RUST_LOG=INFO
 CMD ["rse_crawler"]

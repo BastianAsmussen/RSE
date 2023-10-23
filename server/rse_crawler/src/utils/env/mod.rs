@@ -1,3 +1,2 @@
 pub mod crawler;
-pub mod database;
-pub mod seed_urls;
+pub mod seed_url;

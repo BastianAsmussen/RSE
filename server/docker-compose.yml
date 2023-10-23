@@ -29,16 +29,17 @@ services:
       backend:
         ipv4_address: 10.5.0.4
   database:
-    image: mysql:8.1.0
+    image: postgres:16.0
     container_name: rse_database
     restart: always
     volumes:
-      - ./database/storage:/var/lib/mysql
+      - ./database/storage:/var/lib/postgresql/data
     environment:
-      MYSQL_ROOT_PASSWORD: toor
-      MYSQL_DATABASE: rse
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: toor
+      POSTGRES_DB: rse
     ports:
-      - '3306:3306'
+      - '5432:5432'
     networks:
       backend:
         ipv4_address: 10.5.0.2

@@ -2,32 +2,33 @@
 
 diesel::table! {
     forward_links (id) {
-        id -> Integer,
-        page_id -> Nullable<Integer>,
-        #[max_length = 255]
-        url -> Nullable<Varchar>,
+        id -> Int4,
+        page_id -> Int4,
+        #[max_length = 2048]
+        url -> Varchar,
     }
 }
 
 diesel::table! {
     keywords (id) {
-        id -> Integer,
-        page_id -> Nullable<Integer>,
+        id -> Int4,
+        page_id -> Int4,
         #[max_length = 64]
-        keyword -> Nullable<Varchar>,
-        frequency -> Nullable<Integer>,
+        keyword -> Varchar,
+        frequency -> Int4,
     }
 }
 
 diesel::table! {
     pages (id) {
-        id -> Integer,
-        #[max_length = 255]
+        id -> Int4,
+        #[max_length = 2048]
         url -> Varchar,
         #[max_length = 255]
         title -> Nullable<Varchar>,
-        #[max_length = 255]
+        #[max_length = 1024]
         description -> Nullable<Varchar>,
+        last_crawled_at -> Timestamp,
     }
 }
 
