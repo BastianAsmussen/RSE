@@ -6,6 +6,8 @@ ARG BINARY_NAME
 WORKDIR /usr/src/${BINARY_NAME}
 COPY . .
 
+VOLUME ["/usr/src/database/lib"]
+
 RUN cargo install --path .
 
 ENV RUST_LOG=INFO

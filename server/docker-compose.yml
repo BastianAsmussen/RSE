@@ -21,7 +21,7 @@ services:
     environment:
       SEED_URLS: seed_urls.json
       WORKER_THREADS: 4
-      MAX_CRAWL_DEPTH: 2
+      MAX_CRAWL_DEPTH: 8
     env_file: ../.env
     depends_on:
       - 'database'

@@ -1,5 +1,4 @@
 mod info;
-mod utils;
 
 use actix_web::App;
 use actix_web::HttpServer;
@@ -10,6 +9,8 @@ use crate::info::Info;
 
 #[get("/")]
 async fn handle_query(info: web::Query<Info>) -> impl Responder {
+    let info = info.into_inner();
+
     format!("{info:#?}")
 }
 

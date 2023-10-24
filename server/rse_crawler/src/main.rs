@@ -2,7 +2,6 @@ mod crawler;
 mod utils;
 
 use log::{error, info};
-use db::model::NewPage;
 
 use crate::utils::env::seed_url;
 use crate::utils::timer::{format_time, Timer};
@@ -33,25 +32,16 @@ async fn main() {
         }
     };
 
-    // Map the seed URLs to `NewPage`s.
-    let seed_pages = seed_urls
-        .iter()
-        .map(|url| NewPage {
-            url: url.to_string(),
-            title: None,
-            description: None,
-        })
-        .collect::<Vec<NewPage>>();
+    // Create a new crawler.
+    let mut crawler = crawler::Crawler::new(&seed_urls);
 
-    // Create a new frontier.
-    info!("Creating a new frontier...");
-    let Ok(mut frontier) = crawler::frontier::Frontier::new(&seed_pages, 100).await else {
-        error!("Failed to create a new frontier, exiting...");
-
-        return;
+    // Start the crawler.
+    info!("Starting the crawler...");
+    match crawler.start().await {
+        Ok(()) => info!(
+            "Crawled {} URLs!",
+            crawler.get_frontier().get_crawled().len()
+        ),
+        Err(why) => error!("Crawling failed: {why}"),
     };
-
-    // Get the next URL to be crawled.
-    info!("Getting the next URL to be crawled...");
-    let next_page = frontier.get_next_page();
 }

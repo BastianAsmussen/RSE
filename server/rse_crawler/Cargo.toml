@@ -17,6 +17,12 @@ serde_json = "1.0.107"
 serde_yaml = "0.9.25"
 
 # Database
-db = { path = "db" }
+crawler-db-lib = { path = "lib" }
 
 # Crawler
+reqwest = "0.11.22"
+
+# Backend
+scraper = "0.17.1"
+stemmer =   "0.3.2"
+url = "2.4.1"
