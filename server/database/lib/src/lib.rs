@@ -1,4 +1,4 @@
-use crate::model::{NewPage, Page};
+use crate::model::{NewForwardLink, NewMetadata, NewPage, Page};
 use diesel::{ConnectionResult, ExpressionMethods, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 
@@ -14,6 +14,12 @@ mod schema;
 /// # Errors
 ///
 /// * If the database connection could not be established.
+///
+/// # Panics
+///
+/// * If the `DATABASE_URL` environment variable is not set.
+/// * If the `DATABASE_URL` environment variable is not valid UTF-8.
+#[allow(clippy::expect_used)]
 pub async fn get_connection() -> ConnectionResult<AsyncPgConnection> {
     let url = std::env::var_os("DATABASE_URL")
         .expect("DATABASE_URL must be set!")
@@ -46,15 +52,11 @@ pub async fn get_connection() -> ConnectionResult<AsyncPgConnection> {
 pub async fn create_page(
     conn: &mut AsyncPgConnection,
     url: &str,
-    title: Option<&str>,
-    description: Option<&str>,
 ) -> Result<Page, diesel::result::Error> {
     use crate::schema::pages::dsl::pages;
 
     let new_page = NewPage {
         url: url.to_string(),
-        title: title.map(std::string::ToString::to_string),
-        description: description.map(std::string::ToString::to_string),
     };
 
     diesel::insert_into(pages)
@@ -92,36 +94,29 @@ pub async fn get_oldest_pages(limit: i64) -> Result<Vec<Page>, Box<dyn std::erro
         .await?)
 }
 
-/// Creates a new keyword.
+/// Creates new metadata.
 ///
 /// # Arguments
 ///
 /// * `conn`: The database connection.
-/// * `page_id`: The ID of the page the keyword is on.
-/// * `keyword`: The keyword and its frequency.
+/// * `data`: The metadata to create.
 ///
 /// # Returns
 ///
-/// * `Result<(), Box<dyn std::error::Error>>` - If the keyword was successfully created.
-/// * `Err(Box<dyn std::error::Error>)` - If the keyword was not created.
+/// * `Result<(), Box<dyn std::error::Error>>` - If the metadata was successfully created.
+/// * `Err(Box<dyn std::error::Error>)` - If the metadata was not created.
 ///
 /// # Errors
 ///
-/// * If the keyword could not be created.
-pub async fn create_keyword(
+/// * If the metadata could not be created.
+pub async fn create_metadata(
     conn: &mut AsyncPgConnection,
-    page_id: i32,
-    keyword: (&str, &i32),
+    data: &[NewMetadata],
 ) -> Result<(), diesel::result::Error> {
-    use crate::schema::keywords::dsl::keywords;
-
-    let (keyword, frequency) = keyword;
-    diesel::insert_into(keywords)
-        .values((
-            schema::keywords::page_id.eq(page_id),
-            schema::keywords::keyword.eq(keyword),
-            schema::keywords::frequency.eq(frequency),
-        ))
+    use crate::schema::metadata::dsl::metadata;
+    
+    diesel::insert_into(metadata)
+        .values(data)
         .execute(conn)
         .await?;
 
@@ -133,29 +128,25 @@ pub async fn create_keyword(
 /// # Arguments
 ///
 /// * `conn`: The database connection.
-/// * `page_id`: The ID of the page the link is on.
-/// * `url`: The URL of the link.
+/// 
+/// * `links`: The links to create.
 ///
 /// # Returns
 ///
-/// * `Result<(), Box<dyn std::error::Error>>` - If the link was successfully created.
-/// * `Err(Box<dyn std::error::Error>)` - If the link was not created.
+/// * `Result<(), Box<dyn std::error::Error>>` - If the links were successfully created.
+/// * `Err(Box<dyn std::error::Error>)` - If the links were not created.
 ///
 /// # Errors
 ///
-/// * If the link could not be created.
-pub async fn create_link(
+/// * If the links could not be created.
+pub async fn create_links(
     conn: &mut AsyncPgConnection,
-    page_id: i32,
-    url: &str,
+    links: &[NewForwardLink]
 ) -> Result<(), diesel::result::Error> {
     use crate::schema::forward_links::dsl::forward_links;
 
     diesel::insert_into(forward_links)
-        .values((
-            schema::forward_links::page_id.eq(page_id),
-            schema::forward_links::url.eq(url),
-        ))
+        .values(links)
         .execute(conn)
         .await?;
 

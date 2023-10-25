@@ -20,10 +20,6 @@ pub struct Page {
     pub id: i32,
 
     pub url: String,
-
-    pub title: Option<String>,
-    pub description: Option<String>,
-
     pub last_crawled_at: SystemTime,
 }
 
@@ -40,49 +36,44 @@ pub struct Page {
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewPage {
     pub url: String,
-
-    pub title: Option<String>,
-    pub description: Option<String>,
 }
 
-/// A keyword.
+/// A metadata value.
 ///
 /// # Fields
 ///
 /// * `id`: The ID of the keyword.
-///
 /// * `page_id`: The ID of the page the keyword is on.
 ///
-/// * `keyword`: The keyword.
-/// * `frequency`: The frequency of the keyword.
+/// * `name`: The name of the metadata.
+/// * `content`: The content of the metadata.
 #[derive(Debug, Queryable, Selectable)]
-#[diesel(table_name = crate::schema::keywords)]
+#[diesel(table_name = crate::schema::metadata)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct Keyword {
+pub struct Metadata {
     pub id: i32,
-
     pub page_id: i32,
 
-    pub keyword: String,
-    pub frequency: i32,
+    pub name: String,
+    pub content: String,
 }
 
-/// A new keyword.
+/// A new metadata value.
 ///
 /// # Fields
 ///
 /// * `page_id`: The ID of the page the keyword is on.
 ///
-/// * `keyword`: The keyword.
-/// * `frequency`: The frequency of the keyword.
+/// * `name`: The name of the metadata.
+/// * `content`: The content of the metadata.
 #[derive(Debug, Insertable)]
-#[diesel(table_name = crate::schema::keywords)]
+#[diesel(table_name = crate::schema::metadata)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NewKeyword {
+pub struct NewMetadata {
     pub page_id: i32,
 
-    pub keyword: String,
-    pub frequency: i32,
+    pub name: String,
+    pub content: String,
 }
 
 /// A forward link.
@@ -90,7 +81,6 @@ pub struct NewKeyword {
 /// # Fields
 ///
 /// * `id`: The ID of the forward link.
-///
 /// * `page_id`: The ID of the page the forward link is on.
 ///
 /// * `url`: The URL of the forward link.
@@ -99,7 +89,6 @@ pub struct NewKeyword {
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ForwardLink {
     pub id: i32,
-
     pub page_id: i32,
 
     pub url: String,
