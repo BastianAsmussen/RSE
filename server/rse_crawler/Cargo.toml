@@ -21,10 +21,15 @@ db = { path = "../database/lib" }
 diesel = "2.1.0"
 diesel-async = { version = "0.4.1", features = ["postgres"] }
 
+# Error Handling
+thiserror = "1.0.50"
+
 # Crawler
 reqwest = "0.11.22"
+tokio-stream = "0.1.14"
 
-# Backend
+# Spider
+async-trait = "0.1.74"
+futures = "0.3.28"
+regex = "1.10.1"
 scraper = "0.17.1"
-stemmer =   "0.3.2"
-url = "2.4.1"

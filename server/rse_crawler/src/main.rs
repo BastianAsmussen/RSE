@@ -1,7 +1,10 @@
 mod crawler;
+mod error;
+mod spiders;
 mod utils;
 
 use log::{error, info};
+use std::sync::Arc;
 
 use crate::utils::env::seed_url;
 use crate::utils::timer::{format_time, Timer};
@@ -32,16 +35,24 @@ async fn main() {
         }
     };
 
-    // Create a new crawler.
-    let mut crawler = crawler::Crawler::new(&seed_urls);
+    // Create a crawler.
+    let crawler = crawler::Crawler::default();
 
-    // Start the crawler.
-    info!("Starting the crawler...");
-    match crawler.start().await {
-        Ok(()) => info!(
-            "Crawled {} URLs!",
-            crawler.get_frontier().get_crawled().len()
-        ),
-        Err(why) => error!("Crawling failed: {why}"),
-    };
+    // Create a spider.
+    let spider = spiders::html::WebSpider::default();
+
+    // Run the crawler.
+    info!("Running the crawler...");
+
+    let (time, ()) = timer
+        .time(|| async {
+            crawler.run(Arc::new(spider)).await;
+        })
+        .await;
+
+    info!(
+        "Crawled {} URLs in {}!",
+        seed_urls.len(),
+        format_time(&time)
+    );
 }
