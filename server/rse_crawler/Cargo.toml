@@ -17,7 +17,9 @@ serde_json = "1.0.107"
 serde_yaml = "0.9.25"
 
 # Database
-crawler-db-lib = { path = "lib" }
+db = { path = "../database/lib" }
+diesel = "2.1.0"
+diesel-async = { version = "0.4.1", features = ["postgres"] }
 
 # Crawler
 reqwest = "0.11.22"

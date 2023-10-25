@@ -1,12 +1,20 @@
 version: '3.8'
 
 services:
+  rse_base:
+    image: rse_base
+    build:
+      context: .
+      dockerfile: ./rse_base.Dockerfile
   rse_server:
-    build: ./rse_server
+    build:
+      context: ./rse_server
+      dockerfile: ../rse_server.Dockerfile
     container_name: rse_server
     restart: always
     env_file: ../.env
     depends_on:
+      - 'rse_base'
       - 'database'
     ports:
       - '80:8080'
@@ -15,7 +23,9 @@ services:
         ipv4_address: 10.5.0.3
       frontend:
   rse_crawler:
-    build: ./rse_crawler
+    build:
+      context: ./rse_crawler
+      dockerfile: ../rse_crawler.Dockerfile
     container_name: rse_crawler
     restart: always
     environment:
@@ -24,6 +34,7 @@ services:
       MAX_CRAWL_DEPTH: 8
     env_file: ../.env
     depends_on:
+      - 'rse_base'
       - 'database'
     networks:
       backend:

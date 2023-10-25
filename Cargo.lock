@@ -398,14 +398,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crawler-db-lib"
-version = "0.1.0"
-dependencies = [
- "diesel",
- "diesel-async",
-]
-
-[[package]]
 name = "crc32fast"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -445,6 +437,14 @@ checksum = "13b588ba4ac1a99f7f2964d24b3d896ddc6bf847ee3855dbd4366f058cfcd331"
 dependencies = [
  "quote",
  "syn 2.0.38",
+]
+
+[[package]]
+name = "db"
+version = "0.1.0"
+dependencies = [
+ "diesel",
+ "diesel-async",
 ]
 
 [[package]]
@@ -1479,7 +1479,9 @@ dependencies = [
 name = "rse_crawler"
 version = "0.1.0"
 dependencies = [
- "crawler-db-lib",
+ "db",
+ "diesel",
+ "diesel-async",
  "env_logger",
  "log",
  "reqwest",
@@ -1497,10 +1499,10 @@ name = "rse_server"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "db",
  "env_logger",
  "log",
  "serde",
- "server-db-lib",
 ]
 
 [[package]]
@@ -1681,14 +1683,6 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "server-db-lib"
-version = "0.1.0"
-dependencies = [
- "diesel",
- "diesel-async",
 ]
 
 [[package]]

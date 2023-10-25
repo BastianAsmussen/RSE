@@ -160,19 +160,19 @@ impl Crawler {
         self.frontier.inform_crawled(url);
 
         // Push the web page to the database.
-        let Ok(mut conn) = crawler_db_lib::get_connection().await else {
+        let Ok(mut conn) = db::get_connection().await else {
             warn!("{arrows}Failed to get a connection to the database!");
 
             return Ok(());
         };
 
-        let page = match crawler_db_lib::create_page(
+        let page = match db::create_page(
             &mut conn,
             url,
             title.as_deref(),
             description.as_deref(),
         )
-        .await
+            .await
         {
             Ok(page) => {
                 info!("{arrows}Pushed \"{url}\" to the database!");
@@ -189,7 +189,7 @@ impl Crawler {
         // Push the keywords to the database.
         for keyword in &keywords {
             let keyword = (keyword.0.as_str(), keyword.1);
-            match crawler_db_lib::create_keyword(&mut conn, page.id, keyword).await {
+            match db::create_keyword(&mut conn, page.id, keyword).await {
                 Ok(()) => info!("{arrows}Pushed \"{}\" to the database!", keyword.0),
                 Err(why) => warn!(
                     "{arrows}Failed to push \"{}\" to the database: {why}",
@@ -200,7 +200,7 @@ impl Crawler {
 
         // Push the links to the database.
         for link in &links {
-            match crawler_db_lib::create_link(&mut conn, page.id, link).await {
+            match db::create_link(&mut conn, page.id, link).await {
                 Ok(()) => info!("{arrows}Pushed \"{link}\" to the database!"),
                 Err(why) => warn!("{arrows}Failed to push \"{link}\" to the database: {why}"),
             };
