@@ -1,34 +1,41 @@
 use log::warn;
+use std::time::Duration;
 
-/// The default maximum depth to crawl to.
-const DEFAULT_MAX_CRAWL_DEPTH: usize = 1;
+/// The default delay between each request.
+const DEFAULT_DELAY: Duration = Duration::from_secs(1);
 
-/// Get the maximum depth to crawl to.
+/// Get the delay between each request.
 ///
 /// # Returns
 ///
-/// * The maximum depth to crawl to.
+/// * The delay between each request in seconds.
 ///
 /// # Notes
 ///
-/// * If the `MAX_CRAWL_DEPTH` environment variable isn't set, the default value is used.
-/// * The default value is `default_max_crawl_depth`.
-pub fn get_max_crawl_depth() -> usize {
-    std::env::var_os("MAX_CRAWL_DEPTH").map_or_else(
-        || DEFAULT_MAX_CRAWL_DEPTH,
-        |max_crawl_depth| {
-            let Some(max_crawl_depth) = max_crawl_depth.to_str() else {
-                warn!("Failed to parse MAX_CRAWL_DEPTH to string slice, defaulting to {DEFAULT_MAX_CRAWL_DEPTH}...");
+/// * If the `DELAY` environment variable isn't set, the default value is used.
+/// * The default value is `DEFAULT_DELAY`.
+pub fn get_delay() -> Duration {
+    std::env::var_os("DELAY").map_or_else(
+        || DEFAULT_DELAY,
+        |delay| {
+            let Some(delay) = delay.to_str() else {
+                warn!(
+                    "Failed to parse DELAY to string slice, defaulting to {}s...",
+                    DEFAULT_DELAY.as_secs()
+                );
 
-                return 2;
+                return DEFAULT_DELAY;
             };
 
-            match max_crawl_depth.parse::<usize>() {
-                Ok(max_crawl_depth) => max_crawl_depth,
+            match delay.parse::<u64>() {
+                Ok(delay) => Duration::from_secs(delay),
                 Err(why) => {
-                    warn!("MAX_CRAWL_DEPTH isn't a valid number, defaulting to {DEFAULT_MAX_CRAWL_DEPTH}... (Error: {why})");
+                    warn!(
+                        "DELAY isn't a valid number, defaulting to {}s... (Error: {why})",
+                        DEFAULT_DELAY.as_secs()
+                    );
 
-                    DEFAULT_MAX_CRAWL_DEPTH
+                    DEFAULT_DELAY
                 }
             }
         },

@@ -115,6 +115,7 @@ impl<'a> SeedURLReader<'a> {
 /// # Returns
 ///
 /// * A `Result` with the seed URLs as a `Vec<String>` if successful.
+#[allow(clippy::expect_used)]
 pub fn fetch() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // Load the file path from the environment variable.
     let file_path = std::env::var_os("SEED_URLS")
