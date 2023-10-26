@@ -1,13 +1,13 @@
 use crate::error::Error;
 use crate::utils;
 use async_trait::async_trait;
-use log::{info};
-use regex::Regex;
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 use db::model::NewMetadata;
+use log::info;
+use regex::Regex;
+use reqwest::{Client, Url};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Duration;
 
 /// A spider that crawls a website.
 ///
@@ -59,9 +59,9 @@ impl WebSpider {
 /// * `forward_links` - The forward links of the website.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebItem {
-    url: String,
+    url: Url,
     metadata: HashMap<String, String>,
-    forward_links: HashSet<String>,
+    forward_links: Vec<Url>,
 }
 
 #[async_trait]
@@ -73,58 +73,86 @@ impl super::Spider for WebSpider {
     }
 
     #[allow(clippy::expect_used)]
-    fn seed_urls(&self) -> Vec<String> {
-        utils::env::seed_url::fetch().expect("Failed to fetch seed URLs!")
+    fn seed_urls(&self) -> Vec<Url> {
+        let seed_urls = utils::env::seed_url::fetch().expect("Failed to fetch seed URLs!");
+
+        seed_urls
+            .iter()
+            .map(|seed_url| Url::parse(seed_url).expect("Failed to parse seed URL!"))
+            .collect()
     }
 
-    async fn scrape(&self, url: &str) -> Result<(Vec<Self::Item>, Vec<String>), super::Error> {
-        let response = self.http_client.get(url).send().await?;
+    async fn scrape(&self, url: &Url) -> Result<(Vec<Self::Item>, Vec<Url>), super::Error> {
+        let response = self.http_client.get(url.as_str()).send().await?;
 
         let html = response.text().await?;
 
         let mut urls = Vec::new();
-
         for capture in self.regex.captures_iter(&html) {
-            if let Some(url) = capture.get(1) {
-                info!("Found URL: {}", url.as_str());
+            if let Some(captured_url) = capture.get(1) {
+                let normalized_url = normalize_url(url, captured_url.as_str())?;
 
-                urls.push(url.as_str().to_string());
+                urls.push(normalized_url.clone());
+
+                info!("Found URL: {normalized_url}");
             }
         }
 
         // let urls = filter_non_scrapable(urls).await?;
-        let urls = normalize_urls(url, urls);
 
         let items = vec![WebItem {
-            url: url.to_string(),
+            url: url.clone(),
             metadata: get_metadata(&html)?,
-            forward_links: urls.iter().cloned().collect(),
+            forward_links: urls.clone(),
         }];
 
         Ok((items, urls))
     }
 
+    #[allow(clippy::expect_used)]
     async fn process(&self, item: Self::Item) -> Result<(), super::Error> {
         info!("Processing URL: {}", item.url);
 
-        // Insert the item into the database.
         let mut conn = db::get_connection().await?;
 
         let page = db::create_page(&mut conn, &item.url).await?;
-        let metadata = item.metadata.iter().map(|metadata| NewMetadata {
-            page_id: page.id,
 
-            name: metadata.0.to_string(),
-            content: metadata.1.to_string(),
-        }).collect::<Vec<NewMetadata>>();
+        info!("Inserted page...");
+        let metadata = item
+            .metadata
+            .iter()
+            .map(|metadata| NewMetadata {
+                page_id: page.id,
+
+                name: metadata.0.to_string(),
+                content: metadata.1.to_string(),
+            })
+            .collect::<Vec<NewMetadata>>();
+
+        info!("Inserting {} metadata tags...", metadata.len());
         db::create_metadata(&mut conn, &metadata).await?;
 
-        let forward_links = item.forward_links.iter().map(|forward_link| db::model::NewForwardLink {
-            page_id: page.id,
+        // Count how many times each forward link appears, and add them to the HashMap.
+        let forward_links =
+            item.forward_links
+                .into_iter()
+                .fold(HashMap::new(), |mut map, forward_link| {
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        map.entry(forward_link.clone())
+                    {
+                        e.insert(1);
+                    } else {
+                        let frequency = map
+                            .get_mut(&forward_link)
+                            .expect("Failed to get forward link frequency!");
+                        *frequency += 1;
+                    }
 
-            url: forward_link.to_string(),
-        }).collect::<Vec<db::model::NewForwardLink>>();
-        db::create_links(&mut conn, &forward_links).await?;
+                    map
+                });
+
+        info!("Inserting {} forward links...", forward_links.len());
+        db::create_links(&mut conn, &item.url, &forward_links).await?;
 
         Ok(())
     }
@@ -138,9 +166,9 @@ impl super::Spider for WebSpider {
 ///
 /// # Returns
 ///
-/// * `Ok(Vec<String>)` - The scrapable URLs.
+/// * `Ok(Vec<Url>)` - The scrapable URLs.
 /// * `Err(Error)` - The error.
-async fn filter_non_scrapable(urls: Vec<String>) -> Result<Vec<String>, Error> {
+async fn filter_non_scrapable(urls: Vec<Url>) -> Result<Vec<Url>, Error> {
     todo!("Implement filter_non_scrapable!")
 }
 
@@ -152,7 +180,7 @@ async fn filter_non_scrapable(urls: Vec<String>) -> Result<Vec<String>, Error> {
 /// use rse_crawler::spiders::html::get_root_url;
 ///
 /// let url = "https://www.example.com/path/to/page";
-/// let root_url = get_root_url(url).unwrap();
+/// let root_url = get_root_url(url);
 ///
 /// assert_eq!(root_url, "https://www.example.com");
 /// ```
@@ -163,63 +191,54 @@ async fn filter_non_scrapable(urls: Vec<String>) -> Result<Vec<String>, Error> {
 ///
 /// # Returns
 ///
-/// * `Ok(String)` - The root URL.
+/// * `Ok(Url)` - The root URL.
 /// * `Err(Error)` - The error.
-#[allow(clippy::expect_used)]
-fn get_root_url(url: &str) -> Result<String, Error> {
-    let regex = Regex::new(r"^(https?://[^/]+)")?;
-    let Some(captures) = regex.captures(url) else {
-        return Err(Error::Internal("Failed to get captures!".to_string()));
-    };
+fn get_root_url(url: Url) -> Url {
+    let mut root_url = url;
 
-    captures.get(1).map_or_else(
-        || Err(Error::Internal("Failed to get root URL!".to_string())),
-        |root_url| Ok(root_url.as_str().to_string()),
-    )
+    root_url.set_path("");
+    root_url.set_query(None);
+    root_url.set_fragment(None);
+
+    root_url
 }
 
-/// Normalizes the URLs.
+/// Normalizes the URL.
 ///
 /// # Arguments
 ///
-/// * `origin` - The origin URL.
-/// * `urls` - The URLs.
+/// * `origin_url` - The origin URL.
+/// * `to_normalize` - The URL to normalize.
 ///
 /// # Returns
 ///
-/// * `Vec<String>` - The normalized URLs.
+/// * `Ok(Url)` - The normalized URL.
+/// * `Err(Error)` - The error.
 #[allow(clippy::expect_used)]
-fn normalize_urls(origin: &str, urls: Vec<String>) -> Vec<String> {
-    let mut normalized_urls = Vec::new();
+fn normalize_url(origin_url: &Url, to_normalize: &str) -> Result<Url, Error> {
+    let mut normalized_url = origin_url.join(to_normalize)?;
 
-    for url in urls {
-        // Check if a given URL refers to an absolute or relative path.
-        let is_absolute = url.starts_with("http://") || url.starts_with("https://");
+    // If the normalized URL has an extension, return an error.
+    if normalized_url.path_segments().is_some() {
+        let path_segments = normalized_url
+            .path_segments()
+            .expect("Failed to get path segments!");
 
-        // If the URL is absolute, then we can just add it to the list of normalized URLs.
-        if is_absolute {
-            normalized_urls.push(url);
-
-            continue;
+        if path_segments
+            .last()
+            .expect("Failed to get last path segment!")
+            .contains('.')
+        {
+            return Err(Error::Url(format!(
+                "URL has an extension: {normalized_url}"
+            )));
         }
+    };
 
-        // If the URL is relative, then we need to normalize it.
-        let root_url = get_root_url(origin).expect("Failed to get root URL!");
+    normalized_url.set_fragment(None);
+    normalized_url.set_query(None);
 
-        // Filter the URLs, so that they don't end or start with a slash.
-        let root_url = root_url.trim_end_matches('/');
-        let url = url.trim_start_matches('/');
-
-        // Make sure no illegal characters are in the URL.
-        let illegal_characters = ["#", "?"];
-        if illegal_characters.iter().any(|illegal_character| url.contains(illegal_character)) {
-            continue;
-        }
-
-        normalized_urls.push(format!("{root_url}/{url}"));
-    }
-
-    normalized_urls
+    Ok(normalized_url)
 }
 
 /// Extracts the metadata from the HTML.
