@@ -14,6 +14,8 @@ pub enum Error {
     Regex(String),
     #[error("Diesel: {0}")]
     Diesel(String),
+    #[error("URL: {0}")]
+    Url(String),
 }
 
 impl From<String> for Error {
@@ -55,5 +57,11 @@ impl From<diesel::result::Error> for Error {
 impl From<diesel::result::ConnectionError> for Error {
     fn from(error: diesel::result::ConnectionError) -> Self {
         Self::Diesel(error.to_string())
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(error: url::ParseError) -> Self {
+        Self::Url(error.to_string())
     }
 }
