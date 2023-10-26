@@ -55,7 +55,7 @@ pub fn get_processing_workers() -> usize {
                 "PROCESSING_WORKERS is not set! Using default value of {DEFAULT_CRAWLER_WORKERS}..."
             );
 
-            DEFAULT_CRAWLER_WORKERS
+            DEFAULT_PROCESSING_WORKERS
         },
         |worker_threads| {
             worker_threads
