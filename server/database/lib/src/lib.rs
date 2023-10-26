@@ -1,6 +1,9 @@
 use crate::model::{NewForwardLink, NewMetadata, NewPage, Page};
 use diesel::{ConnectionResult, ExpressionMethods, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
+use std::collections::HashMap;
+use url::Url;
+use log::{error, info};
 
 pub mod model;
 mod schema;
@@ -38,9 +41,6 @@ pub async fn get_connection() -> ConnectionResult<AsyncPgConnection> {
 ///
 /// * `url`: The URL of the page.
 ///
-/// * `title`: The title of the page.
-/// * `description`: The description of the page.
-///
 /// # Returns
 ///
 /// * `Result<Page, Box<dyn std::error::Error>>` - The created page if successful.
@@ -51,7 +51,7 @@ pub async fn get_connection() -> ConnectionResult<AsyncPgConnection> {
 /// * If the page could not be created.
 pub async fn create_page(
     conn: &mut AsyncPgConnection,
-    url: &str,
+    url: &Url,
 ) -> Result<Page, diesel::result::Error> {
     use crate::schema::pages::dsl::pages;
 
@@ -114,7 +114,7 @@ pub async fn create_metadata(
     data: &[NewMetadata],
 ) -> Result<(), diesel::result::Error> {
     use crate::schema::metadata::dsl::metadata;
-    
+
     diesel::insert_into(metadata)
         .values(data)
         .execute(conn)
@@ -128,7 +128,7 @@ pub async fn create_metadata(
 /// # Arguments
 ///
 /// * `conn`: The database connection.
-/// 
+///
 /// * `links`: The links to create.
 ///
 /// # Returns
@@ -139,16 +139,81 @@ pub async fn create_metadata(
 /// # Errors
 ///
 /// * If the links could not be created.
-pub async fn create_links(
+pub async fn create_links<S>(
     conn: &mut AsyncPgConnection,
-    links: &[NewForwardLink]
-) -> Result<(), diesel::result::Error> {
+    from_url: &Url,
+    links: &HashMap<Url, i32, S>,
+) -> Result<(), diesel::result::Error>
+where
+    S: std::hash::BuildHasher + Send + Sync,
+{
     use crate::schema::forward_links::dsl::forward_links;
 
-    diesel::insert_into(forward_links)
-        .values(links)
-        .execute(conn)
-        .await?;
+    let mut new_links = Vec::new();
+    for (to_url, frequency) in links {
+        let from_page = match get_page_by_url(conn, from_url).await {
+            Ok(page) => page,
+            Err(err) => {
+                error!("{err}");
 
-    Ok(())
+                continue;
+            }
+        };
+        let to_page = match get_page_by_url(conn, to_url).await {
+            Ok(page) => page,
+            Err(err) => {
+                error!("{err}");
+
+                continue;
+            }
+        };
+
+        new_links.push(NewForwardLink {
+            from_page_id: from_page.id,
+            to_page_id: to_page.id,
+            frequency: *frequency,
+        });
+    }
+
+    let total_links = new_links.len();
+
+    match diesel::insert_into(forward_links)
+        .values(new_links)
+        .execute(conn)
+        .await {
+        Ok(_) => {
+            info!("Inserted {total_links} links.");
+
+            Ok(())
+        }
+        Err(err) => {
+            error!("{err}");
+
+            Err(err)
+        },
+    }
+}
+
+/// Gets a page by its URL.
+///
+/// # Arguments
+///
+/// * `conn`: The database connection.
+/// * `url`: The URL of the page.
+///
+/// # Returns
+///
+/// * `Result<Page, diesel::result::Error>` - The page if successful.
+/// * `Err(diesel::result::Error)` - If the page could not be retrieved.
+///
+/// # Errors
+///
+/// * If the page could not be retrieved.
+pub async fn get_page_by_url(
+    conn: &mut AsyncPgConnection,
+    url: &Url,
+) -> Result<Page, diesel::result::Error> {
+    use crate::schema::pages::dsl::{pages, url as url_column};
+
+    pages.filter(url_column.eq(url.as_str())).first(conn).await
 }
