@@ -1,9 +1,10 @@
-use crate::model::{NewForwardLink, NewMetadata, NewPage, Page};
-use diesel::{ConnectionResult, ExpressionMethods, QueryDsl, SelectableHelper};
+use crate::model::{NewForwardLink, NewMetadata, NewPage, Page, Metadata};
+use diesel::{ConnectionResult, ExpressionMethods, QueryDsl, SelectableHelper, TextExpressionMethods};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use std::collections::HashMap;
 use url::Url;
 use log::{error, info};
+use serde::Deserialize;
 
 pub mod model;
 mod schema;
@@ -43,7 +44,7 @@ pub async fn get_connection() -> ConnectionResult<AsyncPgConnection> {
 ///
 /// # Returns
 ///
-/// * `Result<Page, Box<dyn std::error::Error>>` - The created page if successful.
+/// * `Ok(Page)` - The created page if successful.
 /// * `Err(Box<dyn std::error::Error>)` - If the page could not be created.
 ///
 /// # Errors
@@ -75,7 +76,8 @@ pub async fn create_page(
 ///
 /// # Returns
 ///
-/// * A `Result` with the oldest pages if successful.
+/// * `Ok(Vec<Page>)` - The oldest pages if successful.
+/// * `Err(Box<dyn std::error::Error>)` - If the pages could not be retrieved.
 ///
 /// # Errors
 ///
@@ -103,7 +105,7 @@ pub async fn get_oldest_pages(limit: i64) -> Result<Vec<Page>, Box<dyn std::erro
 ///
 /// # Returns
 ///
-/// * `Result<(), Box<dyn std::error::Error>>` - If the metadata was successfully created.
+/// * `Ok(())` - If the metadata was successfully created.
 /// * `Err(Box<dyn std::error::Error>)` - If the metadata was not created.
 ///
 /// # Errors
@@ -133,7 +135,7 @@ pub async fn create_metadata(
 ///
 /// # Returns
 ///
-/// * `Result<(), Box<dyn std::error::Error>>` - If the links were successfully created.
+/// * `Ok(())` - If the links were successfully created.
 /// * `Err(Box<dyn std::error::Error>)` - If the links were not created.
 ///
 /// # Errors
@@ -203,7 +205,7 @@ where
 ///
 /// # Returns
 ///
-/// * `Result<Page, diesel::result::Error>` - The page if successful.
+/// * `Ok(Page)` - The page if successful.
 /// * `Err(diesel::result::Error)` - If the page could not be retrieved.
 ///
 /// # Errors
@@ -216,4 +218,75 @@ pub async fn get_page_by_url(
     use crate::schema::pages::dsl::{pages, url as url_column};
 
     pages.filter(url_column.eq(url.as_str())).first(conn).await
+}
+
+/// Gets metadata by page ID.
+///
+/// # Arguments
+///
+/// * `conn`: The database connection.
+/// * `page_id`: The ID of the page.
+///
+/// # Returns
+///
+/// * `Ok(Vec<Metadata>)` - The metadata if successful.
+/// * `Err(diesel::result::Error)` - If the metadata could not be retrieved.
+///
+/// # Errors
+///
+/// * If the metadata could not be retrieved.
+pub async fn get_metadata_by_page_id(
+    conn: &mut AsyncPgConnection,
+    page_id: i32,
+) -> Result<Vec<Metadata>, diesel::result::Error> {
+    use crate::schema::metadata::dsl::{metadata, page_id as page_id_column};
+
+    metadata
+        .filter(page_id_column.eq(page_id))
+        .select(Metadata::as_select())
+        .load(conn)
+        .await
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CompletePage {
+    pub url: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub keywords: Option<String>,
+}
+
+pub async fn get_description_like(
+    conn: &mut AsyncPgConnection,
+    query: &str,
+) -> Result<Vec<CompletePage>, diesel::result::Error> {
+    use crate::schema::pages::dsl::{pages};
+    use crate::schema::metadata::dsl::{metadata};
+
+    let data = metadata
+        .filter(schema::metadata::dsl::name.eq("description"))
+        .filter(schema::metadata::dsl::content.like(format!("%{query}%")))
+        .select(Metadata::as_select())
+        .load(conn)
+        .await?;
+
+    let page = pages
+        .filter(schema::pages::dsl::id.eq(data[0].page_id))
+        .select(Page::as_select())
+        .load(conn)
+        .await?;
+
+    let mut complete_pages = Vec::new();
+    for value in data {
+        let description = value.content;
+
+        complete_pages.push(CompletePage {
+            url: page[0].url.clone(),
+            title: None,
+            description: Some(description),
+            keywords: None,
+        });
+    }
+
+    Ok(complete_pages)
 }

@@ -11,7 +11,14 @@ use crate::info::Info;
 async fn handle_query(info: web::Query<Info>) -> impl Responder {
     let info = info.into_inner();
 
-    format!("{info:#?}")
+    let search_results = match info.search().await {
+        Ok(results) => results,
+        Err(err) => {
+            return format!("{err}");
+        }
+    };
+
+    format!("{search_results:#?}")
 }
 
 #[actix_web::main]

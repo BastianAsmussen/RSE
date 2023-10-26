@@ -447,6 +447,7 @@ dependencies = [
  "diesel-async",
  "env_logger",
  "log",
+ "serde",
  "url",
 ]
 
