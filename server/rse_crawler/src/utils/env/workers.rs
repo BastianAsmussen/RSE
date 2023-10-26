@@ -2,10 +2,12 @@ use log::warn;
 use std::env;
 
 /// The default number of worker threads for crawling.
-const DEFAULT_CRAWLER_WORKERS: usize = 1;
+// TODO: Change this back to 1.
+const DEFAULT_CRAWLER_WORKERS: usize = 8;
 
 /// The default number of worker threads for processing.
-const DEFAULT_PROCESSING_WORKERS: usize = 1;
+// TODO: Change this back to 1.
+const DEFAULT_PROCESSING_WORKERS: usize = 8;
 
 /// Gets the number of workers for crawling.
 ///
