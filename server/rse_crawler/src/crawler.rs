@@ -1,7 +1,8 @@
 use crate::spiders::Spider;
 use crate::utils;
 use futures::stream::StreamExt;
-use log::{debug, error, info};
+use log::{error, info};
+use std::str::FromStr;
 use std::{
     collections::HashSet,
     sync::{
@@ -14,6 +15,7 @@ use tokio::{
     sync::{mpsc, Barrier},
     time::sleep,
 };
+use url::Url;
 
 /// The crawling queue capacity multiplier is used to determine the capacity of the crawling queue.
 const CRAWLING_QUEUE_CAPACITY_MULTIPLIER: usize = 400;
@@ -68,7 +70,7 @@ impl Crawler {
     }
 
     pub async fn run<T: Send + 'static>(&self, spider: Arc<dyn Spider<Item = T>>) {
-        let mut visited_urls = HashSet::<String>::new();
+        let mut visited_urls = HashSet::<Url>::new();
 
         // Define crawling/processing queue capacity, which is twice the number of crawling/processing workers.
         let crawling_workers = self.crawling_workers;
@@ -90,6 +92,15 @@ impl Crawler {
 
         // Send seed URLs to the crawling queue.
         for url in spider.seed_urls() {
+            let url = match Url::from_str(url.as_str()) {
+                Ok(url) => url,
+                Err(err) => {
+                    error!("{err}");
+
+                    continue;
+                }
+            };
+
             visited_urls.insert(url.clone());
 
             let _ = urls_to_visit_tx.send(url).await;
@@ -124,7 +135,7 @@ impl Crawler {
                     if !visited_urls.contains(&url) {
                         visited_urls.insert(url.clone());
 
-                        debug!("Queueing: {url}");
+                        info!("Queueing: {url}");
 
                         let _ = urls_to_visit_tx.send(url).await;
                     }
@@ -192,8 +203,8 @@ impl Crawler {
     fn launch_scrapers<T: Send + 'static>(
         workers: usize,
         spider: Arc<dyn Spider<Item = T>>,
-        urls_to_visit: mpsc::Receiver<String>,
-        new_urls_tx: mpsc::Sender<(String, Vec<String>)>,
+        urls_to_visit: mpsc::Receiver<Url>,
+        new_urls_tx: mpsc::Sender<(Url, Vec<Url>)>,
         items_tx: mpsc::Sender<T>,
         active_spiders: Arc<AtomicUsize>,
         delay: Duration,

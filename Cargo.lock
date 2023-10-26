@@ -445,6 +445,9 @@ version = "0.1.0"
 dependencies = [
  "diesel",
  "diesel-async",
+ "env_logger",
+ "log",
+ "url",
 ]
 
 [[package]]
@@ -1524,6 +1527,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "url",
 ]
 
 [[package]]
@@ -2158,6 +2162,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]
