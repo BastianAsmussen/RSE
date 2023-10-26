@@ -8,10 +8,6 @@ use std::time::SystemTime;
 /// * `id`: The ID of the page.
 ///
 /// * `url`: The URL of the page.
-///
-/// * `title`: The title of the page.
-/// * `description`: The description of the page.
-///
 /// * `last_crawled_at`: The last time the page was crawled.
 #[derive(Debug, Clone, Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::pages)]
@@ -28,9 +24,6 @@ pub struct Page {
 /// # Fields
 ///
 /// * `url`: The URL of the page.
-///
-/// * `title`: The title of the page.
-/// * `description`: The description of the page.
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::pages)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -45,8 +38,8 @@ pub struct NewPage {
 /// * `id`: The ID of the keyword.
 /// * `page_id`: The ID of the page the keyword is on.
 ///
-/// * `name`: The name of the metadata.
-/// * `content`: The content of the metadata.
+/// * `name`: The name of the metadata value.
+/// * `content`: The content of the metadata value.
 #[derive(Debug, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::metadata)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -80,32 +73,34 @@ pub struct NewMetadata {
 ///
 /// # Fields
 ///
-/// * `id`: The ID of the forward link.
-/// * `page_id`: The ID of the page the forward link is on.
+/// * `from_page_id`: The ID of the page the forward link is on.
+/// * `to_page_id`: The ID of the page the forward link points to.
 ///
-/// * `url`: The URL of the forward link.
+/// * `frequency`: The frequency of the forward link.
 #[derive(Debug, Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::forward_links)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ForwardLink {
-    pub id: i32,
-    pub page_id: i32,
+    pub from_page_id: i32,
+    pub to_page_id: i32,
 
-    pub url: String,
+    pub frequency: i32,
 }
 
 /// A new forward link.
 ///
 /// # Fields
 ///
-/// * `page_id`: The ID of the page the forward link is on.
+/// * `from_page_id`: The ID of the page the forward link is on.
+/// * `to_page_id`: The ID of the page the forward link points to.
 ///
-/// * `url`: The URL of the forward link.
+/// * `frequency`: The frequency of the forward link.
 #[derive(Debug, Insertable)]
 #[diesel(table_name = crate::schema::forward_links)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewForwardLink {
-    pub page_id: i32,
+    pub from_page_id: i32,
+    pub to_page_id: i32,
 
-    pub url: String,
+    pub frequency: i32,
 }
