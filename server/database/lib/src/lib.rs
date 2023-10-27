@@ -1,10 +1,13 @@
-use crate::model::{NewForwardLink, NewMetadata, NewPage, Page, Metadata};
-use diesel::{ConnectionResult, ExpressionMethods, QueryDsl, SelectableHelper, TextExpressionMethods};
+use crate::model::{Keyword, Metadata, NewForwardLink, NewKeyword, NewMetadata, NewPage, Page};
+use diesel::{
+    ConnectionResult, ExpressionMethods, OptionalExtension, PgTextExpressionMethods, QueryDsl,
+    SelectableHelper,
+};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
-use std::collections::HashMap;
-use url::Url;
 use log::{error, info};
 use serde::Deserialize;
+use std::collections::HashMap;
+use url::Url;
 
 pub mod model;
 mod schema;
@@ -105,8 +108,8 @@ pub async fn get_oldest_pages(limit: i64) -> Result<Vec<Page>, Box<dyn std::erro
 ///
 /// # Returns
 ///
-/// * `Ok(())` - If the metadata was successfully created.
-/// * `Err(Box<dyn std::error::Error>)` - If the metadata was not created.
+/// * `Ok(())`: If the metadata was successfully created.
+/// * `Err(Box<dyn std::error::Error>)`: If the metadata was not created.
 ///
 /// # Errors
 ///
@@ -125,12 +128,40 @@ pub async fn create_metadata(
     Ok(())
 }
 
+/// Creates new keywords.
+///
+/// # Arguments
+///
+/// * `conn`: The database connection.
+/// * `data`: The keywords to create.
+///
+/// # Returns
+///
+/// * `Ok(())`: If the keywords were successfully created.
+/// * `Err(diesel::result::Error)`: If the keywords weren't successfully inserted.
+///
+/// # Errors
+///
+/// * If the database failed to create the keywords.
+pub async fn create_keywords(
+    conn: &mut AsyncPgConnection,
+    data: &[NewKeyword],
+) -> Result<(), diesel::result::Error> {
+    use crate::schema::keywords::dsl::keywords;
+
+    diesel::insert_into(keywords)
+        .values(data)
+        .execute(conn)
+        .await?;
+
+    Ok(())
+}
+
 /// Creates a new link.
 ///
 /// # Arguments
 ///
 /// * `conn`: The database connection.
-///
 /// * `links`: The links to create.
 ///
 /// # Returns
@@ -182,7 +213,8 @@ where
     match diesel::insert_into(forward_links)
         .values(new_links)
         .execute(conn)
-        .await {
+        .await
+    {
         Ok(_) => {
             info!("Inserted {total_links} links.");
 
@@ -192,8 +224,39 @@ where
             error!("{err}");
 
             Err(err)
-        },
+        }
     }
+}
+
+/// Gets a page by its ID.
+///
+/// # Arguments
+///
+/// * `conn`: The database connection.
+/// * `page_id`: The ID of the page.
+///
+/// # Returns
+///
+/// * `Ok(Some(Vec<Page>))` - The page if successful.
+/// * `Ok(None)` - If no page was found.
+/// * `Err(diesel::result::Error)` - If the page could not be retrieved.
+///
+/// # Errors
+///
+/// * If the page could not be retrieved.
+pub async fn get_page_by_id(
+    conn: &mut AsyncPgConnection,
+    page_id: i32,
+) -> Result<Option<Vec<Page>>, diesel::result::Error> {
+    use crate::schema::pages::dsl::pages;
+    use crate::schema::pages::id;
+
+    pages
+        .filter(id.eq(page_id))
+        .select(Page::as_select())
+        .load(conn)
+        .await
+        .optional()
 }
 
 /// Gets a page by its URL.
@@ -229,7 +292,8 @@ pub async fn get_page_by_url(
 ///
 /// # Returns
 ///
-/// * `Ok(Vec<Metadata>)` - The metadata if successful.
+/// * `Ok(Some(Vec<Metadata>))` - The metadata if successful.
+/// * `Ok(None)` - If no metadata was found.
 /// * `Err(diesel::result::Error)` - If the metadata could not be retrieved.
 ///
 /// # Errors
@@ -238,14 +302,16 @@ pub async fn get_page_by_url(
 pub async fn get_metadata_by_page_id(
     conn: &mut AsyncPgConnection,
     page_id: i32,
-) -> Result<Vec<Metadata>, diesel::result::Error> {
+) -> Result<Option<Vec<Metadata>>, diesel::result::Error> {
     use crate::schema::metadata::dsl::{metadata, page_id as page_id_column};
 
     metadata
         .filter(page_id_column.eq(page_id))
         .select(Metadata::as_select())
+        .limit(1)
         .load(conn)
         .await
+        .optional()
 }
 
 #[derive(Debug, Deserialize)]
@@ -253,40 +319,72 @@ pub struct CompletePage {
     pub url: String,
     pub title: Option<String>,
     pub description: Option<String>,
-    pub keywords: Option<String>,
+    pub keywords: Option<Vec<Keyword>>,
 }
 
-pub async fn get_description_like(
+/// Gets keywords by page ID.
+///
+/// # Arguments
+///
+/// * `conn`: The database connection.
+/// * `page_id`: The ID of the page.
+///
+/// # Returns
+///
+/// * `Ok(Some(Vec<Keyword>))` - The keywords if successful.
+/// * `Ok(None)` - If no keywords were found.
+/// * `Err(diesel::result::Error)` - If the keywords could not be retrieved.
+///
+/// # Errors
+///
+/// * If the keywords could not be retrieved.
+pub async fn get_keywords_by_page_id(
+    conn: &mut AsyncPgConnection,
+    page_id: i32,
+) -> Result<Option<Vec<Keyword>>, diesel::result::Error> {
+    use crate::schema::keywords::dsl::{keywords, page_id as page_id_column};
+
+    keywords
+        .filter(page_id_column.eq(page_id))
+        .select(Keyword::as_select())
+        .load(conn)
+        .await
+        .optional()
+}
+
+/// Get a series of keywords matching a query.
+///
+/// # Arguments
+///
+/// * `conn`: The database connection.
+/// * `query`: The query to search for.
+///
+/// # Returns
+///
+/// * `Ok(Some(Vec<Keyword>))` - The keywords if successful.
+/// * `Ok(None)` - If no keywords were found.
+/// * `Err(diesel::result::Error)` - If the keywords could not be retrieved.
+///
+/// # Errors
+///
+/// * If the keywords could not be retrieved.
+///
+/// # Notes
+///
+/// * A query of multiple words will be split  
+pub async fn get_keywords_like(
     conn: &mut AsyncPgConnection,
     query: &str,
-) -> Result<Vec<CompletePage>, diesel::result::Error> {
-    use crate::schema::pages::dsl::{pages};
-    use crate::schema::metadata::dsl::{metadata};
+) -> Result<Option<Vec<Keyword>>, diesel::result::Error> {
+    use crate::schema::keywords::dsl::keywords;
 
-    let data = metadata
-        .filter(schema::metadata::dsl::name.eq("description"))
-        .filter(schema::metadata::dsl::content.like(format!("%{query}%")))
-        .select(Metadata::as_select())
+    let query = query.split_whitespace().collect::<Vec<&str>>().join("|");
+    let data = keywords
+        .filter(schema::keywords::dsl::word.similar_to(format!("%{query}%")))
+        .select(Keyword::as_select())
         .load(conn)
-        .await?;
+        .await
+        .optional()?;
 
-    let page = pages
-        .filter(schema::pages::dsl::id.eq(data[0].page_id))
-        .select(Page::as_select())
-        .load(conn)
-        .await?;
-
-    let mut complete_pages = Vec::new();
-    for value in data {
-        let description = value.content;
-
-        complete_pages.push(CompletePage {
-            url: page[0].url.clone(),
-            title: None,
-            description: Some(description),
-            keywords: None,
-        });
-    }
-
-    Ok(complete_pages)
+    data.map_or_else(|| Ok(None), |data| Ok(Some(data)))
 }
