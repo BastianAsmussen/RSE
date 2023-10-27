@@ -14,12 +14,11 @@ impl Info {
         };
 
         // Get keywords like the query, and get the pages that have those keywords.
-        let Some(keywords) = db::get_keywords_like(&mut conn, &self.query).await? else {
+        let Some(keywords) = db::get_keywords_like(&mut conn, &self.query.to_lowercase()).await? else {
             return Err("No keywords in any pages found!".into());
         };
 
         let mut results = Vec::new();
-
         for keyword in keywords {
             let Some(pages) = db::get_page_by_id(&mut conn, keyword.id).await? else {
                 return Err("No pages found!".into());

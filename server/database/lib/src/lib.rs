@@ -7,6 +7,7 @@ use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
 use serde::Deserialize;
 use std::collections::HashMap;
+use diesel::query_dsl::InternalJoinDsl;
 use url::Url;
 
 pub mod model;
