@@ -1,4 +1,5 @@
 use diesel::{Insertable, Queryable, Selectable};
+use serde::Deserialize;
 use std::time::SystemTime;
 
 /// A web page.
@@ -67,6 +68,44 @@ pub struct NewMetadata {
 
     pub name: String,
     pub content: String,
+}
+
+/// A keyword.
+///
+/// # Fields
+///
+/// * `id`: The ID of the keyword.
+/// * `page_id`: The ID of the page the keyword is on.
+///
+/// * `word`: The word of the keyword.
+/// * `frequency`: The frequency of the keyword.
+#[derive(Debug, Deserialize, Queryable, Selectable)]
+#[diesel(table_name = crate::schema::keywords)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Keyword {
+    pub id: i32,
+    pub page_id: i32,
+
+    pub word: String,
+    pub frequency: i32,
+}
+
+/// A new keyword.
+///
+/// # Fields
+///
+/// * `page_id`: The ID of the page the keyword is on.
+///
+/// * `word`: The word of the keyword.
+/// * `frequency`: The frequency of the keyword.
+#[derive(Debug, Insertable)]
+#[diesel(table_name = crate::schema::keywords)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct NewKeyword {
+    pub page_id: i32,
+
+    pub word: String,
+    pub frequency: i32,
 }
 
 /// A forward link.
