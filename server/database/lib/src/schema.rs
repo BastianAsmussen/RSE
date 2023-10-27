@@ -9,6 +9,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    keywords (id) {
+        id -> Int4,
+        page_id -> Int4,
+        #[max_length = 128]
+        word -> Varchar,
+        frequency -> Int4,
+    }
+}
+
+diesel::table! {
     metadata (id) {
         id -> Int4,
         page_id -> Int4,
@@ -28,10 +38,12 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(keywords -> pages (page_id));
 diesel::joinable!(metadata -> pages (page_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     forward_links,
+    keywords,
     metadata,
     pages,
 );

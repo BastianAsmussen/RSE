@@ -1,4 +1,3 @@
--- Your SQL goes here
 CREATE TABLE metadata
 (
     id      SERIAL PRIMARY KEY,
