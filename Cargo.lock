@@ -1521,6 +1521,7 @@ dependencies = [
  "log",
  "regex",
  "reqwest",
+ "rust-stemmers",
  "scraper",
  "serde",
  "serde_json",
@@ -1540,6 +1541,16 @@ dependencies = [
  "env_logger",
  "log",
  "serde",
+]
+
+[[package]]
+name = "rust-stemmers"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e46a2036019fdb888131db7a4c847a1063a7493f971ed94ea82c67eada63ca54"
+dependencies = [
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -1603,9 +1614,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scraper"
-version = "0.17.1"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c95a930e03325234c18c7071fd2b60118307e025d6fff3e12745ffbf63a3d29c"
+checksum = "3693f9a0203d49a7ba8f38aa915316b3d535c1862d03dae7009cb71a3408b36a"
 dependencies = [
  "ahash",
  "cssparser",
@@ -1614,7 +1625,6 @@ dependencies = [
  "html5ever",
  "once_cell",
  "selectors",
- "smallvec",
  "tendril",
 ]
 

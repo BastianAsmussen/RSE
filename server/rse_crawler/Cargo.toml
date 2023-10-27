@@ -33,4 +33,5 @@ url = { version = "2.4.1", features = ["serde"] }
 async-trait = "0.1.74"
 futures = "0.3.28"
 regex = "1.10.1"
-scraper = "0.17.1"
+scraper = "0.18.0"
+rust-stemmers = "1.2.0"
