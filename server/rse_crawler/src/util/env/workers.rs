@@ -18,7 +18,7 @@ const DEFAULT_PROCESSING_WORKERS: usize = 1;
 /// * If `CRAWLER_WORKERS` is not valid UTF-8.
 /// * If `CRAWLER_WORKERS` is not a valid number.
 #[allow(clippy::expect_used)]
-pub fn get_crawler_workers() -> usize {
+pub fn get_crawling_workers() -> usize {
     env::var_os("CRAWLER_WORKERS").map_or(
         {
             warn!(

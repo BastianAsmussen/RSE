@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use db::CompletePage;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct Info {
@@ -15,7 +15,8 @@ impl Info {
         };
 
         // Get keywords like the query, and get the pages that have those keywords.
-        let Some(keywords) = db::get_keywords_like(&mut conn, &self.query.to_lowercase()).await? else {
+        let Some(keywords) = db::get_keywords_like(&mut conn, &self.query.to_lowercase()).await?
+        else {
             return Err("No keywords in any pages found!".into());
         };
 

@@ -1,4 +1,6 @@
-use crate::model::{ForwardLink, Keyword, Metadata, NewForwardLink, NewKeyword, NewMetadata, NewPage, Page};
+use crate::model::{
+    ForwardLink, Keyword, Metadata, NewForwardLink, NewKeyword, NewMetadata, NewPage, Page,
+};
 use diesel::{
     ConnectionResult, ExpressionMethods, OptionalExtension, PgTextExpressionMethods, QueryDsl,
     SelectableHelper,
