@@ -1,13 +1,11 @@
-use serde::Deserialize;
-use std::error::Error;
-
 use serde_yaml::Value;
 
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use log::{error, info};
+use log::info;
+use serde::Deserialize;
 
 /// 1 MB as bytes.
 const MAX_BYTES_TO_READ: u64 = 1_024_000;
@@ -32,7 +30,7 @@ struct SeedURLs {
     niche_or_specialized_websites: Option<Vec<String>>,
 }
 
-// Define a trait for different file format strategies
+// Define a trait for different file format strategies.
 trait SeedURLStrategy {
     fn read_seed_urls(&self, content: &str) -> Option<Vec<String>>;
 }
@@ -97,7 +95,7 @@ impl<'a> SeedURLReader<'a> {
     fn read_seed_urls_from_file<T>(
         &self,
         file_path: T,
-    ) -> Result<Option<Vec<String>>, Box<dyn Error>>
+    ) -> Result<Option<Vec<String>>, std::io::Error>
     where
         T: AsRef<Path>,
     {
@@ -116,52 +114,36 @@ impl<'a> SeedURLReader<'a> {
 ///
 /// # Returns
 ///
-/// * An `Option` containing either `Some(Vec<String>)` or `None`.
-pub fn fetch() -> Option<Vec<String>> {
+/// * A `Result` with the seed URLs as a `Vec<String>` if successful.
+#[allow(clippy::expect_used)]
+pub fn fetch() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // Load the file path from the environment variable.
-    let Ok(file_path) = std::env::var_os("SEED_URLS")?.into_string() else {
-        error!("Failed to parse seed URLs path to string!");
+    let file_path = std::env::var_os("SEED_URLS")
+        .expect("SEED_URLS must be set!")
+        .to_str()
+        .expect("SEED_URLS must be valid UTF-8!")
+        .to_string();
 
-        return None;
-    };
-    info!("Loading seed URLs from {}...", file_path);
+    info!("Loading seed URLs from {file_path}...");
 
     // Define the reader.
     let path = Path::new(&file_path);
-    let extension = path.extension()?;
+    let Some(extension) = path.extension() else {
+        return Err("Invalid file extension, no reader implemented for \"\"!".into());
+    };
     let reader = match extension.to_str() {
-        Some("json") => {
-            info!("Using JSON strategy for seed URL reader...");
-
-            SeedURLReader::new(&JSONStrategy)
+        Some("json") => SeedURLReader::new(&JSONStrategy),
+        Some("yaml" | "yml") => SeedURLReader::new(&YAMLStrategy),
+        Some(extension) => {
+            return Err(format!(
+                "Invalid file extension, no reader implemented for \".{extension}\"!"
+            )
+            .into())
         }
-        Some("yaml" | "yml") => {
-            info!("Using YAML strategy for seed URL reader...");
-
-            SeedURLReader::new(&YAMLStrategy)
-        }
-        _ => {
-            error!("Invalid file extension, no reader implemented!");
-
-            return None;
-        }
+        None => return Err("Invalid file extension, no reader implemented for \"\"!".into()),
     };
 
-    match reader.read_seed_urls_from_file(path) {
-        Ok(seed_urls) => {
-            let Some(urls) = seed_urls else {
-                error!("Failed to read seed URLs, empty data!");
-
-                return None;
-            };
-
-            Some(urls)
-        }
-        Err(err) => {
-            error!("Failed to read seed URLs!");
-            error!("Error: {err}");
-
-            None
-        }
-    }
+    // Read the seed URLs from the file.
+    (reader.read_seed_urls_from_file(path)?)
+        .map_or_else(|| Err("Failed to read seed URLs!".into()), Ok)
 }

@@ -2,48 +2,44 @@ version: '3.8'
 
 services:
   rse_server:
-    build: ./rse_server
+    build:
+      context: .
+      dockerfile: rse_server.Dockerfile
     container_name: rse_server
     restart: always
-    environment:
-        MYSQL_SERVER: 10.5.0.2
-        MYSQL_PORT: 3306
-        MYSQL_DATABASE: rse
-        MYSQL_USERNAME: root
-        MYSQL_PASSWORD: toor
+    env_file: ../.env
     depends_on:
       - 'database'
+    ports:
+      - '80:8080'
     networks:
       backend:
         ipv4_address: 10.5.0.3
+      frontend:
   rse_crawler:
-    build: ./rse_crawler
+    build:
+      context: .
+      dockerfile: rse_crawler.Dockerfile
     container_name: rse_crawler
     restart: always
-    environment:
-        SEED_URLS: seed_urls.json
-        WORKER_THREADS: 4
-        MYSQL_SERVER: 10.5.0.2
-        MYSQL_PORT: 3306
-        MYSQL_DATABASE: rse
-        MYSQL_USERNAME: root
-        MYSQL_PASSWORD: toor
+    env_file: ../.env
     depends_on:
       - 'database'
     networks:
       backend:
         ipv4_address: 10.5.0.4
   database:
-    image: mysql:8.1.0
+    image: postgres:16.0
     container_name: rse_database
     restart: always
     volumes:
-      - ./database/storage:/var/lib/mysql
+      - ./database/storage:/var/lib/postgresql/data
     environment:
-        MYSQL_ROOT_PASSWORD: toor
-        MYSQL_DATABASE: rse
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: toor
+      POSTGRES_DB: rse
     ports:
-      - "3306:3306"
+      - '5432:5432'
     networks:
       backend:
         ipv4_address: 10.5.0.2
@@ -55,3 +51,5 @@ networks:
       config:
         - subnet: 10.5.0.0/16
           gateway: 10.5.0.1
+  frontend:
+    driver: bridge
