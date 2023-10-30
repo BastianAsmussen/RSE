@@ -1,4 +1,4 @@
-use crate::model::{Keyword, Metadata, NewForwardLink, NewKeyword, NewMetadata, NewPage, Page};
+use crate::model::{ForwardLink, Keyword, Metadata, NewForwardLink, NewKeyword, NewMetadata, NewPage, Page};
 use diesel::{
     ConnectionResult, ExpressionMethods, OptionalExtension, PgTextExpressionMethods, QueryDsl,
     SelectableHelper,
@@ -7,7 +7,6 @@ use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
 use serde::Deserialize;
 use std::collections::HashMap;
-use diesel::query_dsl::InternalJoinDsl;
 use url::Url;
 
 pub mod model;
@@ -315,9 +314,9 @@ pub async fn get_metadata_by_page_id(
         .optional()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Hash, Deserialize)]
 pub struct CompletePage {
-    pub url: String,
+    pub page: Page,
     pub title: Option<String>,
     pub description: Option<String>,
     pub keywords: Option<Vec<Keyword>>,
@@ -388,4 +387,71 @@ pub async fn get_keywords_like(
         .optional()?;
 
     data.map_or_else(|| Ok(None), |data| Ok(Some(data)))
+}
+
+/// Get the backlinks for a given page.
+///
+/// # Arguments
+///
+/// * `conn`: The database connection.
+/// * `page`: The page to get backlinks for.
+///
+/// # Returns
+///
+/// * `Ok(Vec<CompletePage>)` - The backlinks if successful.
+/// * `Err(Box<dyn std::error::Error>)` - If the backlinks could not be retrieved.
+///
+/// # Errors
+///
+/// * If the backlinks could not be retrieved.
+pub async fn get_backlinks(
+    conn: &mut AsyncPgConnection,
+    page: &CompletePage,
+) -> Result<Vec<CompletePage>, Box<dyn std::error::Error>> {
+    use crate::schema::forward_links::dsl::forward_links;
+    use crate::schema::pages::dsl::pages;
+
+    let mut backlinks = Vec::new();
+
+    let links = forward_links
+        .filter(schema::forward_links::dsl::to_page_id.eq(page.page.id))
+        .select(ForwardLink::as_select())
+        .load(conn)
+        .await?;
+
+    for link in links {
+        let page = pages
+            .filter(schema::pages::dsl::id.eq(link.from_page_id))
+            .select(Page::as_select())
+            .first(conn)
+            .await?;
+
+        let Some(metadata) = get_metadata_by_page_id(conn, page.id).await? else {
+            return Err("No metadata found!".into());
+        };
+
+        let keywords = get_keywords_by_page_id(conn, page.id).await?;
+
+        let mut title = None;
+        let mut description = None;
+
+        for metadatum in metadata {
+            match metadatum.name.as_str() {
+                "title" => title = Some(metadatum.content),
+                "description" => description = Some(metadatum.content),
+                _ => (),
+            }
+        }
+
+        let complete_page = CompletePage {
+            page,
+            title,
+            description,
+            keywords,
+        };
+
+        backlinks.push(complete_page);
+    }
+
+    Ok(backlinks)
 }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use db::CompletePage;
 use serde::Deserialize;
 
@@ -43,7 +44,7 @@ impl Info {
                 }
 
                 let complete_page = CompletePage {
-                    url: page.url,
+                    page,
                     title,
                     description,
                     keywords,
@@ -52,6 +53,24 @@ impl Info {
                 results.push(complete_page);
             }
         }
+
+        // Rank the results.
+        let mut backlinks = HashMap::new();
+        for result in &results {
+            let page_backlinks = db::get_backlinks(&mut conn, result).await?;
+
+            for backlink in page_backlinks {
+                let count = backlinks.entry(backlink).or_insert(0);
+                *count += 1;
+            }
+        }
+
+        results.sort_by(|a, b| {
+            let a_backlinks = backlinks.get(a).unwrap_or(&0);
+            let b_backlinks = backlinks.get(b).unwrap_or(&0);
+
+            b_backlinks.cmp(a_backlinks)
+        });
 
         Ok(results)
     }

@@ -10,7 +10,7 @@ use std::time::SystemTime;
 ///
 /// * `url`: The URL of the page.
 /// * `last_crawled_at`: The last time the page was crawled.
-#[derive(Debug, Clone, Queryable, Selectable, Insertable)]
+#[derive(Debug, Clone,  Eq, PartialEq, Hash, Deserialize, Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::pages)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Page {
@@ -79,7 +79,7 @@ pub struct NewMetadata {
 ///
 /// * `word`: The word of the keyword.
 /// * `frequency`: The frequency of the keyword.
-#[derive(Debug, Deserialize, Queryable, Selectable)]
+#[derive(Debug, Eq, PartialEq, Hash, Deserialize, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::keywords)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Keyword {
