@@ -11,4 +11,4 @@ CREATE TABLE forward_links
 
     FOREIGN KEY (from_page_id) REFERENCES pages (id) ON DELETE CASCADE,
     FOREIGN KEY (to_page_id) REFERENCES pages (id) ON DELETE CASCADE
-)
+);

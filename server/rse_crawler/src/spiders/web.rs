@@ -1,16 +1,21 @@
-use crate::error::Error;
+use crate::robots::RobotFile;
 use crate::spiders::Spider;
-use crate::util;
-use crate::util::robots::RobotFile;
+use crate::{robots, util};
 use async_trait::async_trait;
-use log::info;
+use db::model::NewKeyword;
+use html5ever::tree_builder::TreeSink;
+use log::{debug, info};
+use regex::Regex;
+use reqwest::header::HeaderValue;
 use reqwest::Client;
+use scraper::Html;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use url::Url;
+use error::Error;
 
 /// A web crawler.
 ///
@@ -18,29 +23,42 @@ use url::Url;
 ///
 /// * `http_client`: The HTTP client to use.
 /// * `robot_files`: The `robots.txt` files for each domain.
+/// * `boundaries`: The boundaries for the words.
 #[derive(Debug)]
 pub struct Web {
     http_client: Client,
     robot_files: RwLock<HashMap<String, RobotFile>>,
+    word_boundaries: (usize, usize, usize, usize),
 }
 
 impl Web {
     /// Creates a new web crawler.
     ///
+    /// # Arguments
+    ///
+    /// * `http_timeout`: The HTTP timeout.
+    /// * `user_agent`: The user agent to use.
+    /// * `word_boundaries`: The boundaries for the words, in order: minimum word frequency, maximum word frequency, minimum word length, maximum word length.
+    ///
     /// # Returns
     ///
     /// A new web crawler.
     #[allow(clippy::expect_used)]
-    pub fn new() -> Self {
-        let http_timeout = Duration::from_secs(10);
+    pub fn new(
+        http_timeout: &Duration,
+        user_agent: &HeaderValue,
+        word_boundaries: (usize, usize, usize, usize),
+    ) -> Self {
         let http_client = Client::builder()
-            .timeout(http_timeout)
+            .timeout(*http_timeout)
+            .user_agent(user_agent)
             .build()
             .expect("Failed to build HTTP client!");
 
         Self {
             http_client,
             robot_files: RwLock::new(HashMap::new()),
+            word_boundaries,
         }
     }
 }
@@ -50,16 +68,241 @@ impl Web {
 /// # Fields
 ///
 /// * `url`: The URL of the page.
-/// * `html`: The HTML of the page.
+/// * `forward_links`: The outbound URLs of the page.
+/// * `raw_html`: The raw HTML of the page.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WebItem {
+pub struct Page {
     pub url: Url,
-    pub html: String,
+    pub forward_links: Vec<Url>,
+    pub raw_html: String,
+}
+
+impl Page {
+    /// Gets the title of a page.
+    ///
+    /// # Arguments
+    ///
+    /// * `html`: The HTML document to get the title from.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<String>`: The title of the page.
+    ///
+    /// # Panics
+    ///
+    /// * If the title selector fails to parse.
+    #[allow(clippy::expect_used)]
+    fn get_title(html: &str) -> Option<String> {
+        Html::parse_document(html)
+            .select(&scraper::Selector::parse("title").expect("Failed to parse title selector!"))
+            .next()
+            .map(|element| element.inner_html().trim().to_string())
+    }
+
+    /// Gets the description of a page.
+    ///
+    /// # Arguments
+    ///
+    /// * `html`: The HTML document to get the description from.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<String>`: The description of the page.
+    ///
+    /// # Panics
+    ///
+    /// * If the description selector fails to parse.
+    #[allow(clippy::expect_used)]
+    fn get_description(html: &str) -> Option<String> {
+        Html::parse_document(html)
+            .select(
+                &scraper::Selector::parse("meta[name=description]")
+                    .expect("Failed to parse description selector!"),
+            )
+            .next()
+            .map(|element| element.inner_html().trim().to_string())
+    }
+
+    /// Gets the language of a page.
+    ///
+    /// # Arguments
+    ///
+    /// * `document`: The HTML document to get the language from.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<String>`: The language of the page.
+    ///
+    /// # Panics
+    ///
+    /// * If the HTML selector fails to parse.
+    #[allow(clippy::expect_used)]
+    fn get_language(html: &str) -> Option<String> {
+        Html::parse_document(html)
+            .select(&scraper::Selector::parse("html").expect("Failed to parse HTML selector!"))
+            .next()
+            .and_then(|element| element.value().attr("lang"))
+            .map(std::string::ToString::to_string)
+    }
+
+    /// Gets the keywords of a page.
+    ///
+    /// # Arguments
+    ///
+    /// * `html`: The HTML document to get the keywords from.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<Vec<String>>`: The keywords of the page.
+    ///
+    /// # Panics
+    ///
+    /// * If the keywords selector fails to parse.
+    #[allow(clippy::expect_used)]
+    fn get_keywords(html: &str) -> Option<Vec<String>> {
+        Html::parse_document(html)
+            .select(
+                &scraper::Selector::parse("meta[name=keywords]")
+                    .expect("Failed to parse keywords selector!"),
+            )
+            .next()
+            .and_then(|element| element.value().attr("content"))
+            .map(|keywords| {
+                keywords
+                    .split(',')
+                    .map(|keyword| keyword.trim().to_string())
+                    .collect()
+            })
+    }
+
+    /// Gets the "spoken" words on a page, excluding HTML tags.
+    ///
+    /// # Arguments
+    ///
+    /// * `html`: The HTML document to get the words from.
+    /// * `language`: The language of the page.
+    /// * `bounds`: The bounds of the words.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<HashMap<String, usize>, Error>`: The words on the page.
+    ///
+    /// # Errors
+    ///
+    /// * If the minimum length is greater than the maximum length.
+    ///
+    /// # Panics
+    ///
+    /// * If the illegal characters regex fails to compile.
+    /// * If the body selector fails to parse.
+    #[allow(clippy::expect_used)]
+    fn get_words(
+        html: &str,
+        language: Option<&str>,
+        boundaries: (usize, usize, usize, usize),
+    ) -> Result<HashMap<String, usize>, Error> {
+        let (minimum_frequency, maximum_frequency, minimum_length, maximum_length) = boundaries;
+
+        if minimum_length > maximum_length {
+            return Err(Error::InvalidBoundaries(
+                "Minimum length cannot be greater than maximum length!".into(),
+            ));
+        }
+        if minimum_frequency > maximum_frequency {
+            return Err(Error::InvalidBoundaries(
+                "Minimum frequency cannot be greater than maximum frequency!".into(),
+            ));
+        }
+
+        let mut document = Html::parse_document(html);
+
+        let mut words = HashMap::new();
+        /*
+         If a word isn't in this regex, it's illegal.
+         Illegal characters are removed from the word.
+         This is to prevent words like "hello!" and "world?" from being counted as different words.
+        */
+        let illegal_characters = Regex::new(r"[^a-zA-Z0-9\u{00C0}-\u{00FF}]+")
+            .expect("Failed to compile illegal characters regex!");
+
+        // Remove script and style tags.
+        let selector =
+            scraper::Selector::parse("script, style").expect("Failed to parse selector!");
+        let node_ids = document
+            .select(&selector)
+            .map(|x| x.id())
+            .collect::<Vec<_>>();
+        for node_id in node_ids {
+            document.remove_from_parent(&node_id);
+        }
+
+        // Get the text from the body.
+        let selector = scraper::Selector::parse("body").expect("Failed to parse body selector!");
+        let element = document
+            .select(&selector)
+            .next()
+            .expect("Failed to get body!");
+
+        let text = &element.text().collect::<Vec<_>>().join(" ");
+        let text = text.split_whitespace();
+
+        for word in text {
+            // Make sure the word doesn't contain illegal characters.
+            let word = illegal_characters.replace_all(word, "");
+            if word.is_empty() {
+                continue;
+            }
+            let word = word.to_lowercase();
+
+            let frequency = words.entry(word).or_insert(0);
+            *frequency += 1;
+        }
+
+        // Get the language of the page, or default to English.
+        let language = language.unwrap_or("en");
+        let stemmer_algorithm = match language {
+            "ar" => rust_stemmers::Algorithm::Arabic,
+            "da" => rust_stemmers::Algorithm::Danish,
+            "nl" => rust_stemmers::Algorithm::Dutch,
+            "fi" => rust_stemmers::Algorithm::Finnish,
+            "fr" => rust_stemmers::Algorithm::French,
+            "de" => rust_stemmers::Algorithm::German,
+            "hu" => rust_stemmers::Algorithm::Hungarian,
+            "it" => rust_stemmers::Algorithm::Italian,
+            "no" => rust_stemmers::Algorithm::Norwegian,
+            "pt" => rust_stemmers::Algorithm::Portuguese,
+            "ro" => rust_stemmers::Algorithm::Romanian,
+            "ru" => rust_stemmers::Algorithm::Russian,
+            "es" => rust_stemmers::Algorithm::Spanish,
+            "sv" => rust_stemmers::Algorithm::Swedish,
+            "tr" => rust_stemmers::Algorithm::Turkish,
+            _ => rust_stemmers::Algorithm::English,
+        };
+        let stemmer = rust_stemmers::Stemmer::create(stemmer_algorithm);
+
+        // Stem the words.
+        let mut stemmed_words = HashMap::new();
+
+        for (word, frequency) in &mut words {
+            let stemmed_word = stemmer.stem(word).to_string();
+
+            let count = stemmed_words.entry(stemmed_word).or_insert(0);
+            *count += *frequency;
+        }
+
+        stemmed_words.retain(|_, frequency| {
+            *frequency >= minimum_frequency && *frequency <= maximum_frequency
+        });
+        stemmed_words
+            .retain(|word, _| word.len() >= minimum_length && word.len() <= maximum_length);
+
+        Ok(stemmed_words)
+    }
 }
 
 #[async_trait]
 impl Spider for Web {
-    type Item = WebItem;
+    type Item = Page;
 
     fn name(&self) -> String {
         String::from("Web")
@@ -67,7 +310,7 @@ impl Spider for Web {
 
     #[allow(clippy::expect_used)]
     fn seed_urls(&self) -> Vec<String> {
-        util::env::seed_url::fetch().expect("Failed to fetch seed URLs!")
+        util::env::data::fetch_seed_urls().expect("Failed to fetch seed URLs!")
     }
 
     #[allow(clippy::expect_used)]
@@ -78,7 +321,7 @@ impl Spider for Web {
             "{}://{}/robots.txt",
             url.scheme(),
             url.host()
-                .ok_or_else(|| Error::Reqwest("Failed to get host!".to_string()))?
+                .ok_or_else(|| Error::Reqwest("Failed to get host!".into()))?
         );
         let domain = url.domain().unwrap_or_default().to_string();
 
@@ -98,7 +341,7 @@ impl Spider for Web {
             }
 
             let contents = response.text().await?;
-            let robots = util::robots::parse(&contents);
+            let robots = robots::parse(&contents);
 
             robot_files.insert(domain.clone(), robots.clone());
             drop(robot_files);
@@ -128,7 +371,7 @@ impl Spider for Web {
         }
 
         let body = response.text().await?;
-        let document = scraper::Html::parse_document(&body);
+        let document = Html::parse_document(&body);
 
         let mut urls = Vec::new();
         for element in document
@@ -142,15 +385,107 @@ impl Spider for Web {
         }
 
         Ok((
-            vec![WebItem {
+            vec![Page {
                 url,
-                html: document.html(),
+                forward_links: urls
+                    .iter()
+                    .map(|url| Url::from_str(url).expect("Failed to parse URL!"))
+                    .collect(),
+                raw_html: document.html(),
             }],
             urls,
         ))
     }
 
+    #[allow(clippy::expect_used)]
     async fn process(&self, item: Self::Item) -> Result<(), Error> {
+        info!("Processing: {}", item.url);
+
+        let title = Page::get_title(&item.raw_html);
+        let description = Page::get_description(&item.raw_html);
+        let language = Page::get_language(&item.raw_html);
+        let keywords = Page::get_keywords(&item.raw_html);
+        let words = Page::get_words(&item.raw_html, language.as_deref(), self.word_boundaries)?;
+
+        debug!("Website Debug Info:");
+        debug!("- URL: {}", item.url);
+        debug!("- Title: {title:#?}");
+        debug!("- Description: {description:#?}");
+        debug!("- Language: {language:#?}");
+        debug!("- Keywords: {keywords:#?}");
+        debug!("- Words: {words:#?}");
+
+        let mut conn = db::get_connection().await?;
+
+        let page = db::create_page(
+            &mut conn,
+            &item.url,
+            title.as_deref(),
+            description.as_deref(),
+        )
+        .await?;
+
+        let mut forward_links = HashMap::new();
+        for url in &item.forward_links {
+            let count = forward_links.entry(url.clone()).or_insert(0);
+            *count += 1;
+        }
+        db::create_links(&mut conn, &item.url, &forward_links).await?;
+
+        let keywords = words
+            .into_iter()
+            .map(|(word, frequency)| NewKeyword {
+                page_id: page.id,
+                word,
+                frequency: i32::try_from(frequency).expect("Failed to convert frequency!"),
+            })
+            .collect::<Vec<_>>();
+        db::create_keywords(&mut conn, &keywords).await?;
+
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn test_get_words() {
+        let html = r#"
+            <html>
+                <head>
+                    <script src="script.js"></script>
+                    <style src="style.css"></style>
+                </head>
+                <body>
+                    <h1>Hello, world!</h1>
+                    <p>This is a test.</p>
+                    <p>This is yet another test.</p>
+                    <p>This is a third test.</p>
+                    <p>This is the final test.</p>
+                </body>
+            </html>
+        "#;
+
+        assert_eq!(
+            Page::get_words(html, None, (1, 4, 1, 5)).expect("Failed to get words!"),
+            vec![
+                ("hello".into(), 1), // "hello" is counted once.
+                ("world".into(), 1), // "world" is counted once.
+                ("this".into(), 4),  // "this" is counted four times.
+                ("is".into(), 4),    // "is" is counted four times.
+                ("a".into(), 2),     // "a" is counted two times.
+                ("test".into(), 4),  // "test" is counted four times.
+                ("yet".into(), 1),   // "yet" is counted once.
+                ("anoth".into(), 1), // "another" is stemmed to "anoth" and counted once.
+                ("third".into(), 1), // "third" is counted once.
+                ("the".into(), 1),   // "the" is counted once.
+                ("final".into(), 1), // "final" is counted once.
+            ]
+            .into_iter()
+            .collect::<HashMap<_, _>>()
+        );
     }
 }

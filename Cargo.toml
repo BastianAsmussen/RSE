@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "server/database/lib",
+    "server/error/lib",
     "server/rse_server",
     "server/rse_crawler",
 ]

@@ -1,5 +1,5 @@
 use diesel::{Insertable, Queryable, Selectable};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
 /// A web page.
@@ -10,7 +10,9 @@ use std::time::SystemTime;
 ///
 /// * `url`: The URL of the page.
 /// * `last_crawled_at`: The last time the page was crawled.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Queryable, Selectable, Insertable)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Queryable, Selectable, Insertable,
+)]
 #[diesel(table_name = crate::schema::pages)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Page {
@@ -18,6 +20,9 @@ pub struct Page {
 
     pub url: String,
     pub last_crawled_at: SystemTime,
+
+    pub title: Option<String>,
+    pub description: Option<String>,
 }
 
 /// A new web page.
@@ -25,49 +30,17 @@ pub struct Page {
 /// # Fields
 ///
 /// * `url`: The URL of the page.
+///
+/// * `title`: The title of the page.
+/// * `description`: The description of the page.
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::pages)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewPage {
     pub url: String,
-}
 
-/// A metadata value.
-///
-/// # Fields
-///
-/// * `id`: The ID of the keyword.
-/// * `page_id`: The ID of the page the keyword is on.
-///
-/// * `name`: The name of the metadata value.
-/// * `content`: The content of the metadata value.
-#[derive(Debug, Queryable, Selectable)]
-#[diesel(table_name = crate::schema::metadata)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct Metadata {
-    pub id: i32,
-    pub page_id: i32,
-
-    pub name: String,
-    pub content: String,
-}
-
-/// A new metadata value.
-///
-/// # Fields
-///
-/// * `page_id`: The ID of the page the keyword is on.
-///
-/// * `name`: The name of the metadata.
-/// * `content`: The content of the metadata.
-#[derive(Debug, Insertable)]
-#[diesel(table_name = crate::schema::metadata)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NewMetadata {
-    pub page_id: i32,
-
-    pub name: String,
-    pub content: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
 }
 
 /// A keyword.
@@ -79,7 +52,7 @@ pub struct NewMetadata {
 ///
 /// * `word`: The word of the keyword.
 /// * `frequency`: The frequency of the keyword.
-#[derive(Debug, Eq, PartialEq, Hash, Deserialize, Queryable, Selectable)]
+#[derive(Debug, Eq, PartialEq, Hash, Serialize, Deserialize, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::keywords)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Keyword {

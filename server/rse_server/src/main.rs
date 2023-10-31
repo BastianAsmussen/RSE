@@ -1,24 +1,26 @@
-mod info;
+mod search;
 
 use actix_web::App;
 use actix_web::HttpServer;
 use actix_web::Responder;
 use actix_web::{get, web};
 
-use crate::info::Info;
+use crate::search::{Info, Output};
 
 #[get("/")]
 async fn handle_query(info: web::Query<Info>) -> impl Responder {
     let info = info.into_inner();
 
-    let search_results = match info.search().await {
-        Ok(results) => results,
-        Err(err) => {
-            return format!("{err}");
-        }
+    let results = match info.search().await {
+        Ok(search_results) => search_results,
+        Err(err) => Output {
+            query: info.query,
+            pages: None,
+            error: Some(error::Error::Internal(err.to_string())),
+        },
     };
 
-    format!("{search_results:#?}")
+    web::Json(results)
 }
 
 #[actix_web::main]

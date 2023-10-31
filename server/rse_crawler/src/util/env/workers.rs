@@ -2,7 +2,7 @@ use log::warn;
 use std::env;
 
 /// The default number of worker threads for crawling.
-const DEFAULT_CRAWLER_WORKERS: usize = 1;
+const DEFAULT_CRAWLING_WORKERS: usize = 1;
 
 /// The default number of worker threads for processing.
 const DEFAULT_PROCESSING_WORKERS: usize = 1;
@@ -15,24 +15,24 @@ const DEFAULT_PROCESSING_WORKERS: usize = 1;
 ///
 /// # Panics
 ///
-/// * If `CRAWLER_WORKERS` is not valid UTF-8.
-/// * If `CRAWLER_WORKERS` is not a valid number.
+/// * If `CRAWLING_WORKERS` is not valid UTF-8.
+/// * If `CRAWLING_WORKERS` is not a valid number.
 #[allow(clippy::expect_used)]
 pub fn get_crawling_workers() -> usize {
-    env::var_os("CRAWLER_WORKERS").map_or(
-        {
+    env::var_os("CRAWLING_WORKERS").map_or_else(
+        || {
             warn!(
-                "CRAWLER_WORKERS is not set! Using default value of {DEFAULT_CRAWLER_WORKERS}..."
+                "CRAWLING_WORKERS is not set! Using default value of {DEFAULT_CRAWLING_WORKERS}..."
             );
 
-            DEFAULT_CRAWLER_WORKERS
+            DEFAULT_CRAWLING_WORKERS
         },
         |worker_threads| {
             worker_threads
                 .to_str()
-                .expect("CRAWLER_WORKERS must be valid UTF-8!")
+                .expect("CRAWLING_WORKERS must be valid UTF-8!")
                 .parse::<usize>()
-                .expect("CRAWLER_WORKERS must be a valid number!")
+                .expect("CRAWLING_WORKERS must be a valid number!")
         },
     )
 }
@@ -49,10 +49,9 @@ pub fn get_crawling_workers() -> usize {
 /// * If `PROCESSING_WORKERS` is not a valid number.
 #[allow(clippy::expect_used)]
 pub fn get_processing_workers() -> usize {
-    env::var_os("PROCESSING_WORKERS").map_or(
-        {
+    env::var_os("PROCESSING_WORKERS").map_or_else(|| {
             warn!(
-                "PROCESSING_WORKERS is not set! Using default value of {DEFAULT_CRAWLER_WORKERS}..."
+                "PROCESSING_WORKERS is not set! Using default value of {DEFAULT_PROCESSING_WORKERS}..."
             );
 
             DEFAULT_PROCESSING_WORKERS

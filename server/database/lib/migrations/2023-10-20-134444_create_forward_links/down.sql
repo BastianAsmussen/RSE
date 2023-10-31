@@ -1,2 +1,2 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE forward_links
+DROP TABLE forward_links;

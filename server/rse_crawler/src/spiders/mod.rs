@@ -1,7 +1,7 @@
 pub mod web;
 
-use crate::error::Error;
 use async_trait::async_trait;
+use error::Error;
 
 /// A generic spider.
 ///

@@ -1,5 +1,5 @@
 mod crawler;
-mod error;
+mod robots;
 mod spiders;
 mod util;
 
@@ -17,6 +17,10 @@ async fn main() {
         env::workers::get_processing_workers(),
     );
 
-    let spider = Arc::new(Web::new());
+    let spider = Arc::new(Web::new(
+        &env::spider::get_http_timeout(),
+        &env::spider::get_user_agent(),
+        env::spider::get_word_boundaries(),
+    ));
     crawler.run(spider).await;
 }

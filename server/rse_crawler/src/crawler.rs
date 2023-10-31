@@ -58,14 +58,14 @@ impl Crawler {
             let _ = urls_to_visit_tx.send(url).await;
         }
 
-        self.launch_processors(
+        Self::launch_processors(
             processing_workers,
             spider.clone(),
             items_rx,
             barrier.clone(),
         );
 
-        self.launch_scrapers(
+        Self::launch_scrapers(
             crawling_workers,
             spider.clone(),
             urls_to_visit_rx,
@@ -120,7 +120,6 @@ impl Crawler {
     /// * `items`: The items to process.
     /// * `barrier`: The barrier to wait on.
     fn launch_processors<T: Send + 'static>(
-        &self,
         workers: usize,
         spider: Arc<dyn Spider<Item = T>>,
         items: mpsc::Receiver<T>,
@@ -150,7 +149,6 @@ impl Crawler {
     /// * `delay`: The delay between requests.
     /// * `barrier`: The barrier to wait on.
     fn launch_scrapers<T: Send + 'static>(
-        &self,
         workers: usize,
         spider: Arc<dyn Spider<Item = T>>,
         urls_to_visit: mpsc::Receiver<String>,

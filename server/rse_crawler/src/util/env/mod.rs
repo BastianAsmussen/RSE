@@ -1,4 +1,4 @@
 pub mod crawler;
-pub mod seed_url;
+pub mod data;
 pub mod spider;
 pub mod workers;

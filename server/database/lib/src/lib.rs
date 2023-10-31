@@ -1,15 +1,12 @@
-use crate::model::{
-    ForwardLink, Keyword, Metadata, NewForwardLink, NewKeyword, NewMetadata, NewPage, Page,
-};
-use diesel::{
-    ConnectionResult, ExpressionMethods, OptionalExtension, PgTextExpressionMethods, QueryDsl,
-    SelectableHelper,
-};
+use crate::model::{ForwardLink, Keyword, NewForwardLink, NewKeyword, NewPage, Page};
+use diesel::{ConnectionResult, ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use url::Url;
+use error::Error;
 
 pub mod model;
 mod schema;
@@ -50,7 +47,7 @@ pub async fn get_connection() -> ConnectionResult<AsyncPgConnection> {
 /// # Returns
 ///
 /// * `Ok(Page)` - The created page if successful.
-/// * `Err(Box<dyn std::error::Error>)` - If the page could not be created.
+/// * `Err(Error)` - If the page could not be created.
 ///
 /// # Errors
 ///
@@ -58,18 +55,23 @@ pub async fn get_connection() -> ConnectionResult<AsyncPgConnection> {
 pub async fn create_page(
     conn: &mut AsyncPgConnection,
     url: &Url,
-) -> Result<Page, diesel::result::Error> {
+    title: Option<&str>,
+    description: Option<&str>,
+) -> Result<Page, Error> {
     use crate::schema::pages::dsl::pages;
 
     let new_page = NewPage {
         url: url.to_string(),
+
+        title: title.map(std::string::ToString::to_string),
+        description: description.map(std::string::ToString::to_string),
     };
 
-    diesel::insert_into(pages)
+    Ok(diesel::insert_into(pages)
         .values(&new_page)
         .returning(Page::as_returning())
         .get_result(conn)
-        .await
+        .await?)
 }
 
 /// Gets the oldest pages.
@@ -82,16 +84,17 @@ pub async fn create_page(
 /// # Returns
 ///
 /// * `Ok(Vec<Page>)` - The oldest pages if successful.
-/// * `Err(Box<dyn std::error::Error>)` - If the pages could not be retrieved.
+/// * `Err(Error)` - If the pages could not be retrieved.
 ///
 /// # Errors
 ///
 /// * If the pages could not be retrieved.
-pub async fn get_oldest_pages(limit: i64) -> Result<Vec<Page>, Box<dyn std::error::Error>> {
-    use crate::schema::pages::dsl::{last_crawled_at, pages};
+pub async fn get_oldest_pages(limit: i64) -> Result<Vec<Page>, Error> {
+    use crate::schema::pages::dsl::pages;
+    use crate::schema::pages::last_crawled_at;
 
     let Ok(mut conn) = get_connection().await else {
-        return Err("Failed to get database connection!".into());
+        return Err(Error::Database("Failed to get database connection!".into()));
     };
 
     Ok(pages
@@ -99,35 +102,6 @@ pub async fn get_oldest_pages(limit: i64) -> Result<Vec<Page>, Box<dyn std::erro
         .limit(limit)
         .load(&mut conn)
         .await?)
-}
-
-/// Creates new metadata.
-///
-/// # Arguments
-///
-/// * `conn`: The database connection.
-/// * `data`: The metadata to create.
-///
-/// # Returns
-///
-/// * `Ok(())`: If the metadata was successfully created.
-/// * `Err(Box<dyn std::error::Error>)`: If the metadata was not created.
-///
-/// # Errors
-///
-/// * If the metadata could not be created.
-pub async fn create_metadata(
-    conn: &mut AsyncPgConnection,
-    data: &[NewMetadata],
-) -> Result<(), diesel::result::Error> {
-    use crate::schema::metadata::dsl::metadata;
-
-    diesel::insert_into(metadata)
-        .values(data)
-        .execute(conn)
-        .await?;
-
-    Ok(())
 }
 
 /// Creates new keywords.
@@ -181,6 +155,7 @@ pub async fn create_links<S>(
 ) -> Result<(), diesel::result::Error>
 where
     S: std::hash::BuildHasher + Send + Sync,
+    RandomState: std::hash::BuildHasher,
 {
     use crate::schema::forward_links::dsl::forward_links;
 
@@ -285,42 +260,9 @@ pub async fn get_page_by_url(
     pages.filter(url_column.eq(url.as_str())).first(conn).await
 }
 
-/// Gets metadata by page ID.
-///
-/// # Arguments
-///
-/// * `conn`: The database connection.
-/// * `page_id`: The ID of the page.
-///
-/// # Returns
-///
-/// * `Ok(Some(Vec<Metadata>))` - The metadata if successful.
-/// * `Ok(None)` - If no metadata was found.
-/// * `Err(diesel::result::Error)` - If the metadata could not be retrieved.
-///
-/// # Errors
-///
-/// * If the metadata could not be retrieved.
-pub async fn get_metadata_by_page_id(
-    conn: &mut AsyncPgConnection,
-    page_id: i32,
-) -> Result<Option<Vec<Metadata>>, diesel::result::Error> {
-    use crate::schema::metadata::dsl::{metadata, page_id as page_id_column};
-
-    metadata
-        .filter(page_id_column.eq(page_id))
-        .select(Metadata::as_select())
-        .limit(1)
-        .load(conn)
-        .await
-        .optional()
-}
-
-#[derive(Debug, Eq, PartialEq, Hash, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct CompletePage {
     pub page: Page,
-    pub title: Option<String>,
-    pub description: Option<String>,
     pub keywords: Option<Vec<Keyword>>,
 }
 
@@ -354,18 +296,18 @@ pub async fn get_keywords_by_page_id(
         .optional()
 }
 
-/// Get a series of keywords matching a query.
+/// Get a series of pages matching a list of words
 ///
 /// # Arguments
 ///
 /// * `conn`: The database connection.
-/// * `query`: The query to search for.
+/// * `words`: The words to search for.
 ///
 /// # Returns
 ///
-/// * `Ok(Some(Vec<Keyword>))` - The keywords if successful.
-/// * `Ok(None)` - If no keywords were found.
-/// * `Err(diesel::result::Error)` - If the keywords could not be retrieved.
+/// * `Ok(Some(Vec<Page>))` - The pages if successful.
+/// * `Ok(None)` - If no pages were found.
+/// * `Err(diesel::result::Error)` - If the pages could not be retrieved.
 ///
 /// # Errors
 ///
@@ -374,21 +316,24 @@ pub async fn get_keywords_by_page_id(
 /// # Notes
 ///
 /// * A query of multiple words will be split  
-pub async fn get_keywords_like(
+pub async fn get_pages_with_words(
     conn: &mut AsyncPgConnection,
-    query: &str,
-) -> Result<Option<Vec<Keyword>>, diesel::result::Error> {
+    words: Vec<&str>,
+) -> Result<Option<Vec<Page>>, diesel::result::Error> {
     use crate::schema::keywords::dsl::keywords;
+    use crate::schema::pages::dsl::pages;
 
-    let query = query.split_whitespace().collect::<Vec<&str>>().join("|");
-    let data = keywords
-        .filter(schema::keywords::dsl::word.similar_to(format!("%{query}%")))
-        .select(Keyword::as_select())
+    // Search for pages that contain at least one of the words.
+    let found_pages = keywords
+        .filter(schema::keywords::dsl::word.eq_any(words))
+        .inner_join(pages)
+        .distinct()
+        .select(Page::as_select())
         .load(conn)
         .await
         .optional()?;
 
-    data.map_or_else(|| Ok(None), |data| Ok(Some(data)))
+    Ok(found_pages)
 }
 
 /// Get the backlinks for a given page.
@@ -409,7 +354,7 @@ pub async fn get_keywords_like(
 pub async fn get_backlinks(
     conn: &mut AsyncPgConnection,
     page: &CompletePage,
-) -> Result<Vec<CompletePage>, Box<dyn std::error::Error>> {
+) -> Result<Vec<CompletePage>, Error> {
     use crate::schema::forward_links::dsl::forward_links;
     use crate::schema::pages::dsl::pages;
 
@@ -428,29 +373,9 @@ pub async fn get_backlinks(
             .first(conn)
             .await?;
 
-        let Some(metadata) = get_metadata_by_page_id(conn, page.id).await? else {
-            return Err("No metadata found!".into());
-        };
-
         let keywords = get_keywords_by_page_id(conn, page.id).await?;
 
-        let mut title = None;
-        let mut description = None;
-
-        for metadatum in metadata {
-            match metadatum.name.as_str() {
-                "title" => title = Some(metadatum.content),
-                "description" => description = Some(metadatum.content),
-                _ => (),
-            }
-        }
-
-        let complete_page = CompletePage {
-            page,
-            title,
-            description,
-            keywords,
-        };
+        let complete_page = CompletePage { page, keywords };
 
         backlinks.push(complete_page);
     }
