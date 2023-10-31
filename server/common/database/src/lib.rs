@@ -1,12 +1,12 @@
 use crate::model::{ForwardLink, Keyword, NewForwardLink, NewKeyword, NewPage, Page};
 use diesel::{ConnectionResult, ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
+use error::Error;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use url::Url;
-use error::Error;
 
 pub mod model;
 mod schema;
@@ -143,7 +143,7 @@ pub async fn create_keywords(
 /// # Returns
 ///
 /// * `Ok(())` - If the links were successfully created.
-/// * `Err(Box<dyn std::error::Error>)` - If the links were not created.
+/// * `Err(Box<dyn std::errors::Error>)` - If the links were not created.
 ///
 /// # Errors
 ///
@@ -318,7 +318,7 @@ pub async fn get_keywords_by_page_id(
 /// * A query of multiple words will be split  
 pub async fn get_pages_with_words(
     conn: &mut AsyncPgConnection,
-    words: Vec<&str>,
+    words: Vec<String>,
 ) -> Result<Option<Vec<Page>>, diesel::result::Error> {
     use crate::schema::keywords::dsl::keywords;
     use crate::schema::pages::dsl::pages;
@@ -346,7 +346,7 @@ pub async fn get_pages_with_words(
 /// # Returns
 ///
 /// * `Ok(Vec<CompletePage>)` - The backlinks if successful.
-/// * `Err(Box<dyn std::error::Error>)` - If the backlinks could not be retrieved.
+/// * `Err(Box<dyn std::errors::Error>)` - If the backlinks could not be retrieved.
 ///
 /// # Errors
 ///

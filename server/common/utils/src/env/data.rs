@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use error::Error;
 use log::info;
 use serde::Deserialize;
 
@@ -237,9 +238,23 @@ impl<'a> StopWordsReader<'a> {
 ///
 /// # Returns
 ///
-/// * `Result<Vec<String>, Box<dyn std::error::Error>>` - The seed URLs.
+/// * `Result<Vec<String>, Error>` - The seed URLs.
+///
+/// # Errors
+///
+/// * If the file extension is invalid.
+/// * If the file extension is not supported.
+/// * If the file cannot be read.
+/// * If the file cannot be parsed.
+/// * If the file is not valid UTF-8.
+/// * If the file is not a valid JSON, YAML, or text file.
+///
+/// # Panics
+///
+/// * If `SEED_URLS` is not set.
+/// * If `SEED_URLS` is not valid UTF-8.
 #[allow(clippy::expect_used)]
-pub fn fetch_seed_urls() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+pub fn fetch_seed_urls() -> Result<Vec<String>, Error> {
     // Load the file path from the environment variable.
     let file_path = std::env::var_os("SEED_URLS")
         .expect("SEED_URLS must be set!")
@@ -252,24 +267,31 @@ pub fn fetch_seed_urls() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // Define the reader.
     let path = Path::new(&file_path);
     let Some(extension) = path.extension() else {
-        return Err("Invalid file extension, no reader implemented for \"\"!".into());
+        return Err(Error::Internal(
+            "Invalid file extension, no reader implemented for \"\"!".into(),
+        ));
     };
     let reader = match extension.to_str() {
         Some("json") => SeedURLReader::new(&JSONStrategy),
         Some("yaml" | "yml") => SeedURLReader::new(&YAMLStrategy),
         Some("txt") => SeedURLReader::new(&TextStrategy),
         Some(extension) => {
-            return Err(format!(
+            return Err(Error::Internal(format!(
                 "Invalid file extension, no reader implemented for \".{extension}\"!"
-            )
-            .into())
+            )));
         }
-        None => return Err("Invalid file extension, no reader implemented for \"\"!".into()),
+        None => {
+            return Err(Error::Internal(
+                "Invalid file extension, no reader implemented for \"\"!".into(),
+            ))
+        }
     };
 
     // Read the seed URLs from the file.
-    (reader.read_seed_urls_from_file(path)?)
-        .map_or_else(|| Err("Failed to read seed URLs!".into()), Ok)
+    (reader.read_seed_urls_from_file(path)?).map_or_else(
+        || Err(Error::Internal("Failed to read seed URLs!".into())),
+        Ok,
+    )
 }
 
 /// Fetch all the stop words from the provided file.
@@ -279,9 +301,23 @@ pub fn fetch_seed_urls() -> Result<Vec<String>, Box<dyn std::error::Error>> {
 ///
 /// # Returns
 ///
-/// * `Result<Vec<String>, Box<dyn std::error::Error>>` - The stop words.
+/// * `Result<Vec<String>, Error>` - The stop words.
+///
+/// # Errors
+///
+/// * If the file extension is invalid.
+/// * If the file extension is not supported.
+/// * If the file cannot be read.
+/// * If the file cannot be parsed.
+/// * If the file is not valid UTF-8.
+/// * If the file is not a valid JSON, YAML, or text file.
+///
+/// # Panics
+///
+/// * If `SEED_URLS` is not set.
+/// * If `SEED_URLS` is not valid UTF-8.
 #[allow(clippy::expect_used)]
-pub fn fetch_stop_words() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+pub fn fetch_stop_words() -> Result<Vec<String>, Error> {
     // Load the file path from the environment variable.
     let file_path = std::env::var_os("STOP_WORDS")
         .expect("STOP_WORDS must be set!")
@@ -294,22 +330,29 @@ pub fn fetch_stop_words() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // Define the reader.
     let path = Path::new(&file_path);
     let Some(extension) = path.extension() else {
-        return Err("Invalid file extension, no reader implemented for \"\"!".into());
+        return Err(Error::Internal(
+            "Invalid file extension, no reader implemented for \"\"!".into(),
+        ));
     };
     let reader = match extension.to_str() {
         Some("json") => StopWordsReader::new(&JSONStrategy),
         Some("yaml" | "yml") => StopWordsReader::new(&YAMLStrategy),
         Some("txt") => StopWordsReader::new(&TextStrategy),
         Some(extension) => {
-            return Err(format!(
+            return Err(Error::Internal(format!(
                 "Invalid file extension, no reader implemented for \".{extension}\"!"
-            )
-            .into())
+            )));
         }
-        None => return Err("Invalid file extension, no reader implemented for \"\"!".into()),
+        None => {
+            return Err(Error::Internal(
+                "Invalid file extension, no reader implemented for \"\"!".into(),
+            ))
+        }
     };
 
     // Read the stop words from the file.
-    (reader.read_stop_words_from_file(path)?)
-        .map_or_else(|| Err("Failed to read stop words!".into()), Ok)
+    (reader.read_stop_words_from_file(path)?).map_or_else(
+        || Err(Error::Internal("Failed to read stop words!".into())),
+        Ok,
+    )
 }

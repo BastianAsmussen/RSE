@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::time::Instant;
 
 /// A timer that can be used to time multiple functions.
@@ -10,6 +9,7 @@ pub struct Timer {
 
 impl Timer {
     /// Creates a new timer with no times recorded.
+    #[must_use]
     pub const fn new() -> Self {
         Self { times: Vec::new() }
     }
@@ -21,6 +21,8 @@ impl Timer {
     ///
     /// # Examples
     /// ```
+    /// use utils::timer::Timer;
+    ///
     /// let mut timer = Timer::new();
     ///
     /// let (time, result) = timer.time(|| {
@@ -35,13 +37,12 @@ impl Timer {
     /// println!("Function took {} nanoseconds.", time);
     /// println!("Result of function call: {}", result);
     /// ```
-    pub async fn time<F, R, T>(&mut self, function: F) -> (u128, R)
+    pub fn time<F, R>(&mut self, function: F) -> (u128, R)
     where
-        F: FnOnce() -> T + Send,
-        T: Future<Output = R> + Send,
+        F: FnOnce() -> R + Send,
     {
         let start = Instant::now();
-        let result = function().await;
+        let result = function();
         let elapsed = start.elapsed().as_nanos();
 
         self.times.push(elapsed);
@@ -53,6 +54,8 @@ impl Timer {
     ///
     /// # Examples
     /// ```
+    /// use utils::timer::Timer;
+    ///
     /// let mut timer = Timer::new();
     ///
     /// let (time, result) = timer.time(|| {
@@ -73,10 +76,12 @@ impl Timer {
     ///
     ///     sum
     /// });
+    ///
     /// println!("Function took {} nanoseconds.", time);
     ///
     /// // Prints the time it took for both functions to run in nanoseconds.
     /// println!("Total Time: {} nanoseconds.", timer.total_time());
+    #[must_use]
     pub fn total_time(&self) -> u128 {
         self.times.iter().sum()
     }
@@ -95,6 +100,8 @@ impl Default for Timer {
 ///
 /// # Examples
 /// ```
+/// use utils::timer::{format_time, Timer};
+///
 /// let mut timer = Timer::new();
 ///
 /// let (time, result) = timer.time(|| {
@@ -106,8 +113,9 @@ impl Default for Timer {
 ///    sum
 /// });
 ///
-/// println!("Function took {}.", timer.format_time());
+/// println!("Function took {}.", format_time(&time));
 /// ```
+#[must_use]
 pub fn format_time(nanos: &u128) -> String {
     let units = [
         ("year", 31_557_600_000_000_000),

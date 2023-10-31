@@ -22,7 +22,14 @@ pub struct Crawler {
 }
 
 impl Crawler {
-    pub fn new(delay: Duration, crawling_workers: usize, processing_workers: usize) -> Self {
+    /// Creates a new crawler.
+    ///
+    /// # Arguments
+    ///
+    /// * `delay` - The delay between requests.
+    /// * `crawling_workers` - The number of concurrent crawlers.
+    /// * `processing_workers` - The number of concurrent processors.
+    pub const fn new(delay: Duration, crawling_workers: usize, processing_workers: usize) -> Self {
         Self {
             delay,
             crawling_workers,

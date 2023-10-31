@@ -1,15 +1,15 @@
 [package]
-name = "db"
+name = "database"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 # Logging
-log = { version = "0.4.20", features = [] }
+log = "0.4.20"
 env_logger = "0.10.0"
 
 # Error Handling
-error = { path = "../../error/lib" }
+error = { path = "../errors" }
 
 # Database
 diesel = "2.1.3"

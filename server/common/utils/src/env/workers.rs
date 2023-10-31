@@ -18,7 +18,8 @@ const DEFAULT_PROCESSING_WORKERS: usize = 1;
 /// * If `CRAWLING_WORKERS` is not valid UTF-8.
 /// * If `CRAWLING_WORKERS` is not a valid number.
 #[allow(clippy::expect_used)]
-pub fn get_crawling_workers() -> usize {
+#[must_use]
+pub fn get_crawlers() -> usize {
     env::var_os("CRAWLING_WORKERS").map_or_else(
         || {
             warn!(
@@ -48,7 +49,8 @@ pub fn get_crawling_workers() -> usize {
 /// * If `PROCESSING_WORKERS` is not valid UTF-8.
 /// * If `PROCESSING_WORKERS` is not a valid number.
 #[allow(clippy::expect_used)]
-pub fn get_processing_workers() -> usize {
+#[must_use]
+pub fn get_processors() -> usize {
     env::var_os("PROCESSING_WORKERS").map_or_else(|| {
             warn!(
                 "PROCESSING_WORKERS is not set! Using default value of {DEFAULT_PROCESSING_WORKERS}..."

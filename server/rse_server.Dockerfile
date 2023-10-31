@@ -2,8 +2,9 @@ FROM rust:latest
 
 WORKDIR /usr/src/app
 COPY rse_server .
-COPY error/lib ../error/lib
-COPY database/lib ../database/lib
+COPY common/errors ../common/errors
+COPY common/database ../common/database
+COPY common/utils ../common/utils
 
 RUN cargo build --release
 

@@ -33,7 +33,7 @@ services:
     container_name: rse_database
     restart: always
     volumes:
-      - ./database/storage:/var/lib/postgresql/data
+      - ./database:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: toor

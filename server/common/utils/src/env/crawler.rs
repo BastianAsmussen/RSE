@@ -14,6 +14,7 @@ const DEFAULT_DELAY: Duration = Duration::from_secs(1);
 ///
 /// * If the `DELAY` environment variable isn't set, the default value is used.
 /// * The default value is `DEFAULT_DELAY`.
+#[must_use]
 pub fn get_delay() -> Duration {
     std::env::var_os("DELAY").map_or_else(
         || DEFAULT_DELAY,

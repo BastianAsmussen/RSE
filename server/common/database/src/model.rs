@@ -52,7 +52,7 @@ pub struct NewPage {
 ///
 /// * `word`: The word of the keyword.
 /// * `frequency`: The frequency of the keyword.
-#[derive(Debug, Eq, PartialEq, Hash, Serialize, Deserialize, Queryable, Selectable)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::keywords)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Keyword {

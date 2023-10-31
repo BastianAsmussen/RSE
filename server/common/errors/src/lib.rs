@@ -1,23 +1,27 @@
 use diesel::ConnectionError;
+use serde::Serialize;
+use std::io;
 use std::num::TryFromIntError;
 use thiserror::Error;
-use serde::Serialize;
 
-/// An error.
+/// An errors.
 ///
 /// # Variants
 ///
-/// * `Internal`: An internal error.
-/// * `Reqwest`: A reqwest error.
+/// * `Internal`: An internal errors.
+/// * `IO`: An IO errors.
+/// * `Reqwest`: A reqwest errors.
 /// * `InvalidUrl`: An invalid URL.
 /// * `InvalidBoundaries`: Invalid boundaries.
-/// * `Database`: A database error.
-/// * `ParseError`: A parse error.
-/// * `Query`: A query error.
+/// * `Database`: A database errors.
+/// * `ParseError`: A parse errors.
+/// * `Query`: A query errors.
 #[derive(Error, Serialize, Debug, Clone)]
 pub enum Error {
     #[error("Internal")]
     Internal(String),
+    #[error("IO: {0}")]
+    IO(String),
     #[error("Reqwest: {0}")]
     Reqwest(String),
     #[error("Invalid URL: {0}")]
@@ -30,6 +34,12 @@ pub enum Error {
     ParseError(String),
     #[error("Query: {0}")]
     Query(String),
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Self::IO(err.to_string())
+    }
 }
 
 impl From<reqwest::Error> for Error {

@@ -1,11 +1,11 @@
+use crate::robots;
 use crate::robots::RobotFile;
 use crate::spiders::Spider;
-use crate::{robots, util};
 use async_trait::async_trait;
-use db::model::NewKeyword;
+use database::model::NewKeyword;
+use error::Error;
 use html5ever::tree_builder::TreeSink;
 use log::{debug, info};
-use regex::Regex;
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use scraper::Html;
@@ -15,7 +15,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use url::Url;
-use error::Error;
 
 /// A web crawler.
 ///
@@ -216,15 +215,6 @@ impl Page {
 
         let mut document = Html::parse_document(html);
 
-        let mut words = HashMap::new();
-        /*
-         If a word isn't in this regex, it's illegal.
-         Illegal characters are removed from the word.
-         This is to prevent words like "hello!" and "world?" from being counted as different words.
-        */
-        let illegal_characters = Regex::new(r"[^a-zA-Z0-9\u{00C0}-\u{00FF}]+")
-            .expect("Failed to compile illegal characters regex!");
-
         // Remove script and style tags.
         let selector =
             scraper::Selector::parse("script, style").expect("Failed to parse selector!");
@@ -242,25 +232,11 @@ impl Page {
             .select(&selector)
             .next()
             .expect("Failed to get body!");
-
         let text = &element.text().collect::<Vec<_>>().join(" ");
-        let text = text.split_whitespace();
-
-        for word in text {
-            // Make sure the word doesn't contain illegal characters.
-            let word = illegal_characters.replace_all(word, "");
-            if word.is_empty() {
-                continue;
-            }
-            let word = word.to_lowercase();
-
-            let frequency = words.entry(word).or_insert(0);
-            *frequency += 1;
-        }
 
         // Get the language of the page, or default to English.
         let language = language.unwrap_or("en");
-        let stemmer_algorithm = match language {
+        let language = match language {
             "ar" => rust_stemmers::Algorithm::Arabic,
             "da" => rust_stemmers::Algorithm::Danish,
             "nl" => rust_stemmers::Algorithm::Dutch,
@@ -278,25 +254,16 @@ impl Page {
             "tr" => rust_stemmers::Algorithm::Turkish,
             _ => rust_stemmers::Algorithm::English,
         };
-        let stemmer = rust_stemmers::Stemmer::create(stemmer_algorithm);
 
-        // Stem the words.
-        let mut stemmed_words = HashMap::new();
+        // Get the words from the text, stem, filter and count them.
+        let mut words = utils::words::extract(text, language);
 
-        for (word, frequency) in &mut words {
-            let stemmed_word = stemmer.stem(word).to_string();
-
-            let count = stemmed_words.entry(stemmed_word).or_insert(0);
-            *count += *frequency;
-        }
-
-        stemmed_words.retain(|_, frequency| {
+        words.retain(|_, frequency| {
             *frequency >= minimum_frequency && *frequency <= maximum_frequency
         });
-        stemmed_words
-            .retain(|word, _| word.len() >= minimum_length && word.len() <= maximum_length);
+        words.retain(|word, _| word.len() >= minimum_length && word.len() <= maximum_length);
 
-        Ok(stemmed_words)
+        Ok(words)
     }
 }
 
@@ -310,7 +277,7 @@ impl Spider for Web {
 
     #[allow(clippy::expect_used)]
     fn seed_urls(&self) -> Vec<String> {
-        util::env::data::fetch_seed_urls().expect("Failed to fetch seed URLs!")
+        utils::env::data::fetch_seed_urls().expect("Failed to fetch seed URLs!")
     }
 
     #[allow(clippy::expect_used)]
@@ -415,9 +382,9 @@ impl Spider for Web {
         debug!("- Keywords: {keywords:#?}");
         debug!("- Words: {words:#?}");
 
-        let mut conn = db::get_connection().await?;
+        let mut conn = database::get_connection().await?;
 
-        let page = db::create_page(
+        let page = database::create_page(
             &mut conn,
             &item.url,
             title.as_deref(),
@@ -430,7 +397,7 @@ impl Spider for Web {
             let count = forward_links.entry(url.clone()).or_insert(0);
             *count += 1;
         }
-        db::create_links(&mut conn, &item.url, &forward_links).await?;
+        database::create_links(&mut conn, &item.url, &forward_links).await?;
 
         let keywords = words
             .into_iter()
@@ -440,7 +407,7 @@ impl Spider for Web {
                 frequency: i32::try_from(frequency).expect("Failed to convert frequency!"),
             })
             .collect::<Vec<_>>();
-        db::create_keywords(&mut conn, &keywords).await?;
+        database::create_keywords(&mut conn, &keywords).await?;
 
         Ok(())
     }

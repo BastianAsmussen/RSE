@@ -9,12 +9,15 @@ log = "0.4.20"
 env_logger = "0.10.0"
 
 # Error Handling
-error = { path = "../error/lib" }
+error = { path = "../common/errors" }
 
 # Database
-db = { path = "../database/lib" }
+database = { path = "../common/database" }
 diesel = "2.1.0"
-diesel-async = { version = "0.4.1", features = ["postgres"] }
+
+# Utilities
+utils = { path = "../common/utils" }
+rust-stemmers = "1.2.0"
 
 # Web Server
 actix-web = "4.4.0"

@@ -33,6 +33,7 @@ const DEFAULT_MAXIMUM_WORD_LENGTH: usize = 20;
 /// * If `HTTP_TIMEOUT` is not valid UTF-8.
 /// * If `HTTP_TIMEOUT` is not a valid number.
 #[allow(clippy::expect_used)]
+#[must_use]
 pub fn get_http_timeout() -> Duration {
     env::var_os("HTTP_TIMEOUT").map_or_else(
         || {
@@ -66,6 +67,7 @@ pub fn get_http_timeout() -> Duration {
 /// * If `USER_AGENT` is not valid UTF-8.
 /// * If `USER_AGENT` is not a valid header value.
 #[allow(clippy::expect_used)]
+#[must_use]
 pub fn get_user_agent() -> HeaderValue {
     HeaderValue::from_str(&env::var_os("USER_AGENT").map_or_else(
         || {
@@ -88,6 +90,7 @@ pub fn get_user_agent() -> HeaderValue {
 /// # Returns
 ///
 /// * `(usize, usize, usize, usize)` - The boundaries, in order: minimum word frequency, maximum word frequency, minimum word length, maximum word length.
+#[must_use]
 pub fn get_word_boundaries() -> (usize, usize, usize, usize) {
     (
         get_minimum_word_frequency(),
