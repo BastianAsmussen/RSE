@@ -8,14 +8,14 @@ use thiserror::Error;
 ///
 /// # Variants
 ///
-/// * `Internal`: An internal errors.
-/// * `IO`: An IO errors.
-/// * `Reqwest`: A reqwest errors.
+/// * `Internal`: An internal error.
+/// * `IO`: An IO error.
+/// * `Reqwest`: A reqwest error.
 /// * `InvalidUrl`: An invalid URL.
 /// * `InvalidBoundaries`: Invalid boundaries.
-/// * `Database`: A database errors.
-/// * `ParseError`: A parse errors.
-/// * `Query`: A query errors.
+/// * `Database`: A database error.
+/// * `NumberParseError`: A number parse error.
+/// * `Query`: A query error.
 #[derive(Error, Serialize, Debug, Clone)]
 pub enum Error {
     #[error("Internal")]
@@ -31,7 +31,7 @@ pub enum Error {
     #[error("Database: {0}")]
     Database(String),
     #[error("Parse Error: {0}")]
-    ParseError(String),
+    NumberParseError(String),
     #[error("Query: {0}")]
     Query(String),
 }
@@ -68,6 +68,6 @@ impl From<ConnectionError> for Error {
 
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
-        Self::ParseError(err.to_string())
+        Self::NumberParseError(err.to_string())
     }
 }
