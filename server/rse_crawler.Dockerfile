@@ -8,5 +8,5 @@ COPY common/utils ../common/utils
 
 RUN cargo build --release
 
-ENV RUST_LOG=rse_crawler
+ENV RUST_LOG=info
 CMD ["./target/release/rse_crawler"]
