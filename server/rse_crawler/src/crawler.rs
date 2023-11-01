@@ -108,12 +108,11 @@ impl Crawler {
                 }
             }
 
-            if new_urls_tx.capacity() == crawling_queue_capacity // If the new_urls_tx is empty,
-                && urls_to_visit_tx.capacity() == crawling_queue_capacity // and the urls_to_visit_tx is empty,
+            // If the new_urls_tx is empty, the urls_to_visit_tx is empty, and there are no active spiders, we're finished.
+            if new_urls_tx.capacity() == crawling_queue_capacity
+                && urls_to_visit_tx.capacity() == crawling_queue_capacity
                 && active_spiders.load(Ordering::SeqCst) == 0
-            // and there are no active spiders.
             {
-                // We're finished!
                 break;
             }
 
@@ -165,6 +164,7 @@ impl Crawler {
     /// * `active_spiders`: The number of active spiders.
     /// * `delay`: The delay between requests.
     /// * `barrier`: The barrier to wait on.
+    #[allow(clippy::too_many_arguments)]
     fn launch_scrapers<T: Send + 'static>(
         workers: usize,
         spider: Arc<dyn Spider<Item = T>>,
