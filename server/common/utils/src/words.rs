@@ -1,6 +1,6 @@
+use log::debug;
 use regex::Regex;
 use std::collections::HashMap;
-use log::{debug};
 
 /// Get words from content.
 ///
