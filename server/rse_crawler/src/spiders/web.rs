@@ -401,8 +401,8 @@ impl Spider for Web {
         .await?;
 
         let mut forward_links = HashMap::new();
-        for url in &item.forward_links {
-            let count = forward_links.entry(url.clone()).or_insert(0);
+        for url in item.forward_links {
+            let count = forward_links.entry(url).or_insert(0);
             *count += 1;
         }
         database::create_links(&mut conn, &item.url, &forward_links).await?;
