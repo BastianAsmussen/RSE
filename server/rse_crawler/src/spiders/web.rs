@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use database::model::NewKeyword;
 use error::Error;
 use html5ever::tree_builder::TreeSink;
-use log::{debug, info};
+use log::{debug, error, info};
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use scraper::Html;
@@ -299,16 +299,24 @@ impl Spider for Web {
             Some(robots.clone())
         } else if let Ok(response) = self.http_client.get(&robots_url).send().await {
             let status = response.status();
-
             if !status.is_success() {
-                return Err(Error::Reqwest(format!(
-                    "Failed to fetch robots.txt file: {}",
-                    status.canonical_reason().unwrap_or("Unknown")
-                )));
+                let canonical_reason = status.canonical_reason().unwrap_or("Unknown");
+                if canonical_reason != "Not Found" {
+                    return Err(Error::Reqwest(format!(
+                        "Failed to fetch robots.txt file: {canonical_reason}"
+                    )));
+                }
             }
 
-            let contents = response.text().await?;
-            let robots = robots::parse(&contents);
+            // If the robots.txt file is not found, then we assume that the domain is crawlable.
+            let robots = match response.text().await {
+                Ok(contents) => robots::parse(&contents),
+                Err(err) => {
+                    error!("Failed to parse robots.txt file: {err}");
+
+                    RobotFile::default()
+                }
+            };
 
             robot_files.insert(domain.clone(), robots.clone());
             drop(robot_files);
