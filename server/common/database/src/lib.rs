@@ -301,25 +301,21 @@ pub async fn get_keywords_by_page_id(
 ///
 /// * `Ok(Some(Vec<Page>))` - The pages if successful.
 /// * `Ok(None)` - If no pages were found.
-/// * `Err(diesel::result::Error)` - If the pages could not be retrieved.
+/// * `Err(Error)` - If the pages could not be retrieved.
 ///
 /// # Errors
 ///
-/// * If the keywords could not be retrieved.
-///
-/// # Notes
-///
-/// * A query of multiple words will be split  
+/// * If the pages could not be retrieved.
 pub async fn get_pages_with_words(
     conn: &mut AsyncPgConnection,
     words: Vec<String>,
-) -> Result<Option<Vec<Page>>, diesel::result::Error> {
+) -> Result<Option<Vec<Page>>, Error> {
     use crate::schema::keywords::dsl::keywords;
     use crate::schema::pages::dsl::pages;
 
-    // Search for pages that contain at least one of the words.
-    let found_pages = keywords
-        .filter(schema::keywords::dsl::word.eq_any(words))
+    // Search for pages that contain the words in their keywords.
+    let pages_with_keywords = keywords
+        .filter(schema::keywords::dsl::word.eq_any(&words))
         .inner_join(pages)
         .distinct()
         .select(Page::as_select())
@@ -327,7 +323,41 @@ pub async fn get_pages_with_words(
         .await
         .optional()?;
 
-    Ok(found_pages)
+    // Search for pages that contain the words in their title or description.
+    let pages_with_title = pages
+        .filter(schema::pages::dsl::title.eq_any(&words))
+        .select(Page::as_select())
+        .load(conn)
+        .await
+        .optional()?;
+
+    let pages_with_description = pages
+        .filter(schema::pages::dsl::description.eq_any(&words))
+        .select(Page::as_select())
+        .load(conn)
+        .await
+        .optional()?;
+
+    // Combine the results.
+    let mut found_pages = Vec::new();
+
+    if let Some(mut data) = pages_with_keywords {
+        found_pages.append(&mut data);
+    }
+
+    if let Some(mut data) = pages_with_title {
+        found_pages.append(&mut data);
+    }
+
+    if let Some(mut data) = pages_with_description {
+        found_pages.append(&mut data);
+    }
+
+    if found_pages.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(found_pages))
 }
 
 /// Get the backlinks for a given page.

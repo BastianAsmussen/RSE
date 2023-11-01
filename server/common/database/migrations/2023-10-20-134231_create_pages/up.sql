@@ -9,5 +9,7 @@ CREATE TABLE pages
     description     VARCHAR(1024)          DEFAULT NULL
 );
 
--- Use indexing for faster URL search.
+-- Use indexing for faster searches.
 CREATE INDEX pages_url_idx ON pages (url);
+CREATE INDEX pages_title_idx ON pages (title);
+CREATE INDEX pages_description_idx ON pages (description);
