@@ -356,8 +356,8 @@ impl Spider for Web {
                 url,
                 forward_links: urls
                     .iter()
-                    .map(|url| Url::from_str(url).expect("Failed to parse URL!"))
-                    .collect(),
+                    .filter_map(|url| Url::from_str(url).ok())
+                    .collect::<Vec<_>>(),
                 raw_html: document.html(),
             }],
             urls,
