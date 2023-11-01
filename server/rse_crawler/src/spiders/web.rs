@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use database::model::NewKeyword;
 use error::Error;
 use html5ever::tree_builder::TreeSink;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use scraper::Html;
@@ -381,6 +381,12 @@ impl Spider for Web {
         let language = Page::get_language(&item.raw_html);
         let keywords = Page::get_keywords(&item.raw_html);
         let words = Page::get_words(&item.raw_html, language.as_deref(), self.word_boundaries)?;
+        let top_3_words = words
+            .clone()
+            .into_iter()
+            .take(3)
+            .map(|(word, _)| word)
+            .collect::<Vec<_>>();
 
         debug!("Website Debug Info:");
         debug!("- URL: {}", item.url);
@@ -388,10 +394,11 @@ impl Spider for Web {
         debug!("- Description: {description:#?}");
         debug!("- Language: {language:#?}");
         debug!("- Keywords: {keywords:#?}");
-        debug!("- Words: {words:#?}");
+        debug!("- Top 3 Words: {top_3_words:#?}");
 
         let mut conn = database::get_connection().await?;
 
+        info!("Creating page with URL: {}", item.url);
         let page = database::create_page(
             &mut conn,
             &item.url,
@@ -402,10 +409,21 @@ impl Spider for Web {
 
         let mut forward_links = HashMap::new();
         for url in item.forward_links {
+            if url == item.url {
+                warn!("Skipping forward link to self: {}", url);
+
+                continue;
+            }
+
             let count = forward_links.entry(url).or_insert(0);
             *count += 1;
         }
-        database::create_links(&mut conn, &item.url, &forward_links).await?;
+        info!(
+            "Creating {} forward links for page with URL: {}",
+            forward_links.len(),
+            item.url
+        );
+        database::create_forward_links(&mut conn, &item.url, &forward_links).await?;
 
         let keywords = words
             .into_iter()
@@ -415,6 +433,11 @@ impl Spider for Web {
                 frequency: i32::try_from(frequency).expect("Failed to convert frequency!"),
             })
             .collect::<Vec<_>>();
+        info!(
+            "Creating {} keywords for page with URL: {}",
+            keywords.len(),
+            item.url
+        );
         database::create_keywords(&mut conn, &keywords).await?;
 
         Ok(())
