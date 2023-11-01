@@ -91,7 +91,8 @@ impl Crawler {
                     if !visited_urls.contains(&url) {
                         visited_urls.insert(url.clone());
 
-                        info!("Queued URL: {}", url);
+                        let queue_size = urls_to_visit_tx.capacity();
+                        info!("Queued URL: {url} ({queue_size} / {crawling_queue_capacity})");
 
                         let _ = urls_to_visit_tx.send(url).await;
                     }
@@ -174,7 +175,7 @@ impl Crawler {
                         .scrape(queued_url.clone())
                         .await
                         .map_err(|err| {
-                            error!("Failed to scrape {}: {err}", queued_url);
+                            error!("Failed to scrape {queued_url}: {err}");
 
                             err
                         })
