@@ -88,23 +88,25 @@ impl Crawler {
                 visited_urls.insert(visited_url);
 
                 for url in new_urls {
-                    if !visited_urls.contains(&url) {
-                        // Retry sending the URL until it's successfully sent to the queue.
-                        loop {
-                            if urls_to_visit_tx.send(url.to_string()).await.is_err() {
-                                // Sleep for a short duration before retrying.
-                                tokio::time::sleep(Duration::from_millis(5)).await;
+                    if visited_urls.contains(&url) {
+                        continue;
+                    }
 
-                                continue;
-                            }
+                    // Retry sending the URL until it's successfully sent to the queue.
+                    loop {
+                        if urls_to_visit_tx.send(url.to_string()).await.is_err() {
+                            // Sleep for a short duration before retrying.
+                            tokio::time::sleep(Duration::from_millis(5)).await;
 
-                            // URL successfully sent, break the retry loop.
-                            break;
+                            continue;
                         }
 
-                        visited_urls.insert(url.to_string());
-                        info!("Queued URL: {url}");
+                        // URL successfully sent, break the retry loop.
+                        break;
                     }
+
+                    visited_urls.insert(url.to_string());
+                    info!("Queued URL: {url}");
                 }
             }
 
