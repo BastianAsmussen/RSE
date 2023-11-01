@@ -89,12 +89,21 @@ impl Crawler {
 
                 for url in new_urls {
                     if !visited_urls.contains(&url) {
+                        // Retry sending the URL until it's successfully sent to the queue.
+                        loop {
+                            if urls_to_visit_tx.send(url.clone()).await.is_err() {
+                                // Sleep for a short duration before retrying.
+                                tokio::time::sleep(Duration::from_millis(5)).await;
+
+                                continue;
+                            }
+
+                            // URL successfully sent, break the retry loop.
+                            break;
+                        }
+
                         visited_urls.insert(url.clone());
-
-                        let queue_size = urls_to_visit_tx.capacity();
-                        info!("Queued URL: {url} ({queue_size} / {crawling_queue_capacity})");
-
-                        let _ = urls_to_visit_tx.send(url).await;
+                        info!("Queued URL: {url}");
                     }
                 }
             }
@@ -170,6 +179,7 @@ impl Crawler {
             tokio_stream::wrappers::ReceiverStream::new(urls_to_visit)
                 .for_each_concurrent(workers, |queued_url| async {
                     active_spiders.fetch_add(1, Ordering::SeqCst);
+
                     let mut urls = Vec::new();
                     let res = spider
                         .scrape(queued_url.clone())
@@ -185,10 +195,12 @@ impl Crawler {
                         for item in items {
                             let _ = items_tx.send(item).await;
                         }
+
                         urls = new_urls;
                     }
 
                     let _ = new_urls_tx.send((queued_url, urls)).await;
+
                     tokio::time::sleep(delay).await;
                     active_spiders.fetch_sub(1, Ordering::SeqCst);
                 })
