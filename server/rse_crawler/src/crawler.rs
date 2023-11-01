@@ -91,7 +91,7 @@ impl Crawler {
                     if !visited_urls.contains(&url) {
                         // Retry sending the URL until it's successfully sent to the queue.
                         loop {
-                            if urls_to_visit_tx.send(url.clone()).await.is_err() {
+                            if urls_to_visit_tx.send(url.to_string()).await.is_err() {
                                 // Sleep for a short duration before retrying.
                                 tokio::time::sleep(Duration::from_millis(5)).await;
 
@@ -102,15 +102,15 @@ impl Crawler {
                             break;
                         }
 
-                        visited_urls.insert(url.clone());
+                        visited_urls.insert(url.to_string());
                         info!("Queued URL: {url}");
                     }
                 }
             }
 
             // If the new_urls_tx is empty, the urls_to_visit_tx is empty, and there are no active spiders, we're finished.
-            if new_urls_tx.capacity() == crawling_queue_capacity
-                && urls_to_visit_tx.capacity() == crawling_queue_capacity
+            if new_urls_tx.capacity() == 0
+                && urls_to_visit_tx.capacity() == 0
                 && active_spiders.load(Ordering::SeqCst) == 0
             {
                 break;
