@@ -2,7 +2,7 @@ use crate::model::{ForwardLink, Keyword, NewForwardLink, NewKeyword, NewPage, Pa
 use diesel::{ConnectionResult, ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use error::Error;
-use log::{error, info};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
@@ -59,6 +59,12 @@ pub async fn create_page(
     description: Option<&str>,
 ) -> Result<Page, Error> {
     use crate::schema::pages::dsl::pages;
+
+    if let Some(page) = get_page_by_url(conn, url).await? {
+        info!("Page already exists: {}", url.to_string());
+
+        return Ok(page);
+    };
 
     let new_page = NewPage {
         url: url.to_string(),
@@ -152,7 +158,7 @@ pub async fn create_links<S>(
     conn: &mut AsyncPgConnection,
     from_url: &Url,
     links: &HashMap<Url, i32, S>,
-) -> Result<(), diesel::result::Error>
+) -> Result<(), Error>
 where
     S: std::hash::BuildHasher + Send + Sync,
     RandomState: std::hash::BuildHasher,
@@ -161,21 +167,11 @@ where
 
     let mut new_links = Vec::new();
     for (to_url, frequency) in links {
-        let from_page = match get_page_by_url(conn, from_url).await {
-            Ok(page) => page,
-            Err(err) => {
-                error!("{err}");
-
-                continue;
-            }
+        let Some(from_page) = get_page_by_url(conn, from_url).await? else {
+            return Err(Error::Database(format!("Failed to find URL: {from_url}!")));
         };
-        let to_page = match get_page_by_url(conn, to_url).await {
-            Ok(page) => page,
-            Err(err) => {
-                error!("{err}");
-
-                continue;
-            }
+        let Some(to_page) = get_page_by_url(conn, to_url).await? else {
+            return Err(Error::Database(format!("Failed to find URL: {to_url}!")));
         };
 
         new_links.push(NewForwardLink {
@@ -187,22 +183,14 @@ where
 
     let total_links = new_links.len();
 
-    match diesel::insert_into(forward_links)
+    diesel::insert_into(forward_links)
         .values(new_links)
         .execute(conn)
-        .await
-    {
-        Ok(_) => {
-            info!("Inserted {total_links} links.");
+        .await?;
 
-            Ok(())
-        }
-        Err(err) => {
-            error!("{err}");
+    info!("Created {total_links} links!");
 
-            Err(err)
-        }
-    }
+    Ok(())
 }
 
 /// Gets a page by its ID.
@@ -224,16 +212,16 @@ where
 pub async fn get_page_by_id(
     conn: &mut AsyncPgConnection,
     page_id: i32,
-) -> Result<Option<Vec<Page>>, diesel::result::Error> {
+) -> Result<Option<Vec<Page>>, Error> {
     use crate::schema::pages::dsl::pages;
     use crate::schema::pages::id;
 
-    pages
+    Ok(pages
         .filter(id.eq(page_id))
         .select(Page::as_select())
         .load(conn)
         .await
-        .optional()
+        .optional()?)
 }
 
 /// Gets a page by its URL.
@@ -245,8 +233,9 @@ pub async fn get_page_by_id(
 ///
 /// # Returns
 ///
-/// * `Ok(Page)` - The page if successful.
-/// * `Err(diesel::result::Error)` - If the page could not be retrieved.
+/// * `Ok(Some(Vec<Page>))` - The page if successful.
+/// * `Ok(None)` - If no page was found.
+/// * `Err(Error)` - If the page could not be retrieved.
 ///
 /// # Errors
 ///
@@ -254,13 +243,18 @@ pub async fn get_page_by_id(
 pub async fn get_page_by_url(
     conn: &mut AsyncPgConnection,
     url: &Url,
-) -> Result<Page, diesel::result::Error> {
+) -> Result<Option<Page>, Error> {
     use crate::schema::pages::dsl::{pages, url as url_column};
 
-    pages.filter(url_column.eq(url.as_str())).first(conn).await
+    Ok(pages
+        .filter(url_column.eq(url.to_string()))
+        .select(Page::as_select())
+        .first(conn)
+        .await
+        .optional()?)
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct CompletePage {
     pub page: Page,
     pub keywords: Option<Vec<Keyword>>,
