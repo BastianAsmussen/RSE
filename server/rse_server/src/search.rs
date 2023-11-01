@@ -1,5 +1,6 @@
 use database::CompletePage;
 use error::Error;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -25,6 +26,7 @@ impl Info {
     ///
     /// * If the database connection fails.
     /// * If no pages are found.
+    #[allow(clippy::expect_used, clippy::cast_precision_loss)]
     pub async fn search(&self) -> Result<Output, Error> {
         // Get the query.
         let query = match &self.query {
@@ -54,7 +56,8 @@ impl Info {
             return Err(Error::Query("No pages found!".into()));
         };
 
-        let mut results = Vec::new();
+        // Map the pages to their keywords.
+        let mut unordered_pages = Vec::new();
         for page in pages {
             let page_id = page.id;
             let page = CompletePage {
@@ -62,13 +65,13 @@ impl Info {
                 keywords: database::get_keywords_by_page_id(&mut conn, page_id).await?,
             };
 
-            results.push(page);
+            unordered_pages.push(page);
         }
 
-        // Calculate the backlinks for each page.
+        // Find the backlinks for each page.
         let mut backlinks = HashMap::new();
-        for result in &results {
-            let page_backlinks = database::get_backlinks(&mut conn, result).await?;
+        for page in &unordered_pages {
+            let page_backlinks = database::get_backlinks(&mut conn, page).await?;
 
             for backlink in page_backlinks {
                 let count = backlinks.entry(backlink).or_insert(0);
@@ -76,28 +79,71 @@ impl Info {
             }
         }
 
-        // Rank the results based on the number of backlinks and keywords.
-        let mut page_scores = results
-            .iter()
-            .map(|page| {
-                let backlink_count = backlinks.get(page).unwrap_or(&0);
-                let keyword_count = page.keywords.clone().unwrap_or_default().len();
+        // Sum up the token counts for each page, and use that as the relevance score for the page.
+        let mut relevance_scores = HashMap::new();
+        for page in &unordered_pages {
+            let mut score = 0;
+            let Some(keywords) = &page.keywords else {
+                warn!("No keywords for page: {}", page.page.url);
 
-                (page, backlink_count + keyword_count)
-            })
-            .collect::<Vec<_>>();
-        page_scores.sort_by(|a, b| b.1.cmp(&a.1));
+                continue;
+            };
 
-        let pages = page_scores
-            .iter()
-            .map(|(page, _)| page)
-            .collect::<Vec<_>>()
-            .iter()
-            .map(|page| CompletePage {
-                page: page.page.clone(),
-                keywords: None,
-            })
-            .collect::<Vec<_>>();
+            // For each keyword, add the frequency of the keyword times the frequency of the word in the query.
+            for keyword in keywords {
+                if let Some(frequency) = query.get(&keyword.word) {
+                    score += frequency * usize::try_from(keyword.frequency)?;
+                }
+            }
+
+            // Add the score to the page.
+            relevance_scores.insert(page, score);
+        }
+
+        let rating_factor = utils::env::ranker::get_rating_factor();
+        let ranker_constant = utils::env::ranker::get_ranker_constant();
+
+        // Calculate the actual page rank.
+        let mut page_ranks = HashMap::new();
+        for page in relevance_scores.keys().copied() {
+            let mut rank = rating_factor;
+            for backlink in &unordered_pages {
+                if let Some(frequency) = backlinks.get(backlink) {
+                    if backlink.page.id == page.page.id {
+                        continue;
+                    }
+
+                    // Rank is the sum of the relevance scores of the backlinks divided by the number of backlinks.
+                    rank += (relevance_scores
+                        .get(backlink)
+                        .expect("Failed to get backlink score!")
+                        / frequency) as f64;
+                }
+
+                rank *= ranker_constant;
+
+                // Add the rank to the page.
+                page_ranks.insert(page, rank);
+            }
+        }
+
+        // Order the pages by their rank.
+        let pages = {
+            let mut pages = Vec::new();
+            for (page, rank) in page_ranks {
+                pages.push((page, rank));
+            }
+
+            pages.sort_by(|(_, rank_a), (_, rank_b)| {
+                rank_b
+                    .partial_cmp(rank_a)
+                    .expect("Failed to compare ranks!")
+            });
+            pages
+                .into_iter()
+                .map(|(page, _)| page.clone())
+                .collect::<Vec<_>>()
+        };
 
         Ok(Output {
             query: self.query.clone(),
