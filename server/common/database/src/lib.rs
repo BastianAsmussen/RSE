@@ -139,25 +139,26 @@ pub async fn create_keywords(
     Ok(())
 }
 
-/// Creates a new link.
+/// Creates new forward links.
 ///
 /// # Arguments
 ///
 /// * `conn`: The database connection.
-/// * `links`: The links to create.
+/// * `from_page_url`: The page to create forward links for.
+/// * `to_page_urls`: The pages to create forward links to.
 ///
 /// # Returns
 ///
-/// * `Ok(())` - If the links were successfully created.
-/// * `Err(Box<dyn std::errors::Error>)` - If the links were not created.
+/// * `Ok(())` - If the forward links were successfully created.
+/// * `Err(Error>)` - If the forward links were not created.
 ///
 /// # Errors
 ///
-/// * If the links could not be created.
-pub async fn create_links<S>(
+/// * If the forward links could not be created.
+pub async fn create_forward_links<S>(
     conn: &mut AsyncPgConnection,
-    from_url: &Url,
-    links: &HashMap<Url, i32, S>,
+    from_page_url: &Url,
+    to_page_urls: &HashMap<Url, i32, S>,
 ) -> Result<(), Error>
 where
     S: std::hash::BuildHasher + Send + Sync,
@@ -165,30 +166,40 @@ where
 {
     use crate::schema::forward_links::dsl::forward_links;
 
-    let mut new_links = Vec::new();
-    for (to_url, frequency) in links {
-        let Some(from_page) = get_page_by_url(conn, from_url).await? else {
-            return Err(Error::Database(format!("Failed to find URL: {from_url}!")));
-        };
+    // Get the page we're creating forward links for.
+    let Some(from_page) = get_page_by_url(conn, from_page_url).await? else {
+        return Err(Error::Database(format!(
+            "Failed to find page with URL: {from_page_url}!"
+        )));
+    };
+
+    let mut new_forward_links = Vec::new();
+    for (to_url, frequency) in to_page_urls {
+        /*
         let Some(to_page) = get_page_by_url(conn, to_url).await? else {
-            return Err(Error::Database(format!("Failed to find URL: {to_url}!")));
+            return Err(Error::Database(format!(
+                "Failed to find page with URL: {to_url}!"
+            )));
         };
 
-        new_links.push(NewForwardLink {
+        new_forward_links.push(NewForwardLink {
             from_page_id: from_page.id,
             to_page_id: to_page.id,
             frequency: *frequency,
         });
+         */
+
+        new_forward_links.push(NewForwardLink {
+            from_page_id: from_page.id,
+            to_page_url: to_url.to_string(),
+            frequency: *frequency,
+        });
     }
 
-    let total_links = new_links.len();
-
     diesel::insert_into(forward_links)
-        .values(new_links)
+        .values(new_forward_links)
         .execute(conn)
         .await?;
-
-    info!("Created {total_links} links!");
 
     Ok(())
 }
@@ -202,7 +213,7 @@ where
 ///
 /// # Returns
 ///
-/// * `Ok(Some(Vec<Page>))` - The page if successful.
+/// * `Ok(Some(Page))` - The page if successful.
 /// * `Ok(None)` - If no page was found.
 /// * `Err(diesel::result::Error)` - If the page could not be retrieved.
 ///
@@ -212,14 +223,14 @@ where
 pub async fn get_page_by_id(
     conn: &mut AsyncPgConnection,
     page_id: i32,
-) -> Result<Option<Vec<Page>>, Error> {
+) -> Result<Option<Page>, Error> {
     use crate::schema::pages::dsl::pages;
     use crate::schema::pages::id;
 
     Ok(pages
         .filter(id.eq(page_id))
         .select(Page::as_select())
-        .load(conn)
+        .first(conn)
         .await
         .optional()?)
 }
@@ -233,7 +244,7 @@ pub async fn get_page_by_id(
 ///
 /// # Returns
 ///
-/// * `Ok(Some(Vec<Page>))` - The page if successful.
+/// * `Ok(Some(Page))` - The page, if successful.
 /// * `Ok(None)` - If no page was found.
 /// * `Err(Error)` - If the page could not be retrieved.
 ///
@@ -385,7 +396,7 @@ pub async fn get_backlinks(
     let mut backlinks = Vec::new();
 
     let links = forward_links
-        .filter(schema::forward_links::dsl::to_page_id.eq(page.page.id))
+        .filter(schema::forward_links::dsl::to_page_url.eq(&page.page.url))
         .select(ForwardLink::as_select())
         .load(conn)
         .await?;

@@ -81,6 +81,7 @@ pub struct NewKeyword {
     pub frequency: i32,
 }
 
+/*
 /// A forward link.
 ///
 /// # Fields
@@ -98,7 +99,27 @@ pub struct ForwardLink {
 
     pub frequency: i32,
 }
+*/
 
+/// A forward link.
+///
+/// # Fields
+///
+/// * `from_page_id`: The ID of the page the forward link is on.
+///
+/// * `to_page_url`: The URL of the page the forward link points to.
+/// * `frequency`: The frequency of the forward link.
+#[derive(Debug, Queryable, Selectable, Insertable)]
+#[diesel(table_name = crate::schema::forward_links)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct ForwardLink {
+    pub from_page_id: i32,
+
+    pub to_page_url: String,
+    pub frequency: i32,
+}
+
+/*
 /// A new forward link.
 ///
 /// # Fields
@@ -114,5 +135,24 @@ pub struct NewForwardLink {
     pub from_page_id: i32,
     pub to_page_id: i32,
 
+    pub frequency: i32,
+}
+*/
+
+/// A new forward link.
+///
+/// # Fields
+///
+/// * `from_page_id`: The ID of the page the forward link is on.
+///
+/// * `to_page_url`: The URL of the page the forward link points to.
+/// * `frequency`: The frequency of the forward link.
+#[derive(Debug, Insertable)]
+#[diesel(table_name = crate::schema::forward_links)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct NewForwardLink {
+    pub from_page_id: i32,
+
+    pub to_page_url: String,
     pub frequency: i32,
 }

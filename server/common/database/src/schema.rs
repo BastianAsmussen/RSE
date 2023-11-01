@@ -1,9 +1,10 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    forward_links (from_page_id, to_page_id) {
+    forward_links (from_page_id, to_page_url) {
         from_page_id -> Int4,
-        to_page_id -> Int4,
+        #[max_length = 8192]
+        to_page_url -> Varchar,
         frequency -> Int4,
     }
 }
@@ -31,6 +32,7 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(forward_links -> pages (from_page_id));
 diesel::joinable!(keywords -> pages (page_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
