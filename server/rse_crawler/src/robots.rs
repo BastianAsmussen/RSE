@@ -8,7 +8,7 @@ use url::Url;
 /// * `disallow`: The disallowed URLs specified by the `robots.txt` file.
 /// * `allow`: The allowed URLs specified by the `robots.txt` file.
 /// * `content`: The raw contents of the `robots.txt` file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RobotFile {
     pub crawl_delay: Option<u64>,
     pub disallow: Vec<String>,
