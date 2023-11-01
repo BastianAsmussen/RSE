@@ -14,13 +14,13 @@ const DEFAULT_USER_AGENT: &str = formatcp!("RSE/{}", env!("CARGO_PKG_VERSION"));
 const DEFAULT_MINIMUM_WORD_FREQUENCY: usize = 1;
 
 /// The default maximum word frequency.
-const DEFAULT_MAXIMUM_WORD_FREQUENCY: usize = 100;
+const DEFAULT_MAXIMUM_WORD_FREQUENCY: usize = 1_024;
 
 /// The default minimum word length.
-const DEFAULT_MINIMUM_WORD_LENGTH: usize = 3;
+const DEFAULT_MINIMUM_WORD_LENGTH: usize = 2;
 
 /// The default maximum word length.
-const DEFAULT_MAXIMUM_WORD_LENGTH: usize = 20;
+const DEFAULT_MAXIMUM_WORD_LENGTH: usize = 128;
 
 /// Gets the HTTP timeout.
 ///
