@@ -437,13 +437,13 @@ mod tests {
         "#;
 
         assert_eq!(
-            Page::get_words(html, None, (1, 4, 1, 5)).expect("Failed to get words!"),
+            Page::get_words(html, None, utils::env::spider::get_word_boundaries())
+                .expect("Failed to get words!"),
             vec![
                 ("hello".into(), 1), // "hello" is counted once.
                 ("world".into(), 1), // "world" is counted once.
                 ("this".into(), 4),  // "this" is counted four times.
                 ("is".into(), 4),    // "is" is counted four times.
-                ("a".into(), 2),     // "a" is counted two times.
                 ("test".into(), 4),  // "test" is counted four times.
                 ("yet".into(), 1),   // "yet" is counted once.
                 ("anoth".into(), 1), // "another" is stemmed to "anoth" and counted once.

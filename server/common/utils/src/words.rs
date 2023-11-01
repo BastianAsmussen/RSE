@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::collections::HashMap;
+use log::{debug};
 
 /// Get words from content.
 ///
@@ -61,13 +62,17 @@ fn stem(
     language: rust_stemmers::Algorithm,
 ) -> HashMap<String, usize> {
     let stemmer = rust_stemmers::Stemmer::create(language);
-    let mut stemmed_words = HashMap::new();
 
-    for (word, _) in words {
+    let mut stemmed_words = HashMap::new();
+    for (word, frequency) in words {
         let stemmed_word = stemmer.stem(&word);
 
-        let frequency = stemmed_words.entry(stemmed_word.to_string()).or_insert(0);
-        *frequency += 1;
+        if word != stemmed_word {
+            debug!("Stemmed word: {word} -> {stemmed_word}");
+        }
+
+        let count = stemmed_words.entry(stemmed_word.to_string()).or_insert(0);
+        *count += frequency;
     }
 
     stemmed_words
