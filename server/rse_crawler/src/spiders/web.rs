@@ -388,17 +388,17 @@ impl Spider for Web {
             .map(|(word, _)| word)
             .collect::<Vec<_>>();
 
-        debug!("Website Debug Info:");
-        debug!("- URL: {}", item.url);
-        debug!("- Title: {title:#?}");
-        debug!("- Description: {description:#?}");
-        debug!("- Language: {language:#?}");
-        debug!("- Keywords: {keywords:#?}");
-        debug!("- Top 3 Words: {top_3_words:#?}");
+        debug!("=> Website Debug Info:");
+        debug!("=> - URL: {}", item.url);
+        debug!("=> - Title: {title:#?}");
+        debug!("=> - Description: {description:#?}");
+        debug!("=> - Language: {language:#?}");
+        debug!("=> - Keywords: {keywords:#?}");
+        debug!("=> - Top 3 Words: {top_3_words:#?}");
 
         let mut conn = database::get_connection().await?;
 
-        info!("Creating page with URL: {}", item.url);
+        info!("=> Creating page with URL: {}", item.url);
         let page = database::create_page(
             &mut conn,
             &item.url,
@@ -410,7 +410,7 @@ impl Spider for Web {
         let mut forward_links = HashMap::new();
         for url in item.forward_links {
             if url == item.url {
-                warn!("Skipping forward link to self: {}", url);
+                warn!("=> Skipping forward link to self: {}", url);
 
                 continue;
             }
@@ -419,7 +419,7 @@ impl Spider for Web {
             *count += 1;
         }
         info!(
-            "Creating {} forward links for page with URL: {}",
+            "=> Creating {} forward links for page with URL: {}",
             forward_links.len(),
             item.url
         );
@@ -430,11 +430,11 @@ impl Spider for Web {
             .map(|(word, frequency)| NewKeyword {
                 page_id: page.id,
                 word,
-                frequency: i32::try_from(frequency).expect("Failed to convert frequency!"),
+                frequency: i32::try_from(frequency).expect("=> Failed to convert frequency!"),
             })
             .collect::<Vec<_>>();
         info!(
-            "Creating {} keywords for page with URL: {}",
+            "=> Creating {} keywords for page with URL: {}",
             keywords.len(),
             item.url
         );
