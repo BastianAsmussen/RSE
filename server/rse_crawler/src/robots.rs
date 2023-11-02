@@ -9,14 +9,14 @@ use url::Url;
 /// * `allow`: The allowed URLs specified by the `robots.txt` file.
 /// * `content`: The raw contents of the `robots.txt` file.
 #[derive(Debug, Clone, Default)]
-pub struct RobotFile {
+pub struct RobotsFile {
     pub crawl_delay: Option<u64>,
     pub disallow: Vec<String>,
     pub allow: Vec<String>,
     pub content: String,
 }
 
-impl RobotFile {
+impl RobotsFile {
     /// Checks if a URL is crawlable.
     ///
     /// # Arguments
@@ -29,76 +29,79 @@ impl RobotFile {
     pub fn is_crawlable(&self, url: &Url) -> bool {
         let path = url.path().to_lowercase();
 
+        // If the URL is disallowed, return false.
         if self.disallow.iter().any(|url| path.starts_with(url)) {
             return false;
         }
 
+        // If the URL is allowed, return true.
         if self.allow.iter().any(|url| path.starts_with(url)) {
             return true;
         }
 
+        // Assume the URL is allowed.
         true
     }
-}
 
-/// Parses a `robots.txt` file.
-///
-/// # Arguments
-///
-/// * `content`: The content of the `robots.txt` file.
-///
-/// # Returns
-///
-/// The parsed `robots.txt` file.
-#[allow(clippy::expect_used)]
-pub fn parse(content: &str) -> RobotFile {
-    let mut crawl_delay = None;
+    /// Parses a `robots.txt` file.
+    ///
+    /// # Arguments
+    ///
+    /// * `content`: The content of the `robots.txt` file.
+    ///
+    /// # Returns
+    ///
+    /// * `RobotsFile`: The parsed `robots.txt` file.
+    #[allow(clippy::expect_used)]
+    pub fn parse(content: &str) -> RobotsFile {
+        let mut crawl_delay = None;
 
-    let mut user_agent = String::new();
-    let mut disallow = Vec::new();
-    let mut allow = Vec::new();
+        let mut user_agent = String::new();
+        let mut disallow = Vec::new();
+        let mut allow = Vec::new();
 
-    for line in content.lines() {
-        let line = line.trim();
+        for line in content.lines() {
+            let line = line.trim();
 
-        if line.is_empty() {
-            continue;
+            if line.is_empty() {
+                continue;
+            }
+
+            let mut parts = line.splitn(2, ':');
+
+            let key = parts.next().expect("Failed to get key!").to_lowercase();
+            let value = parts.next().unwrap_or_default().trim();
+
+            match key.as_str() {
+                "user-agent" => {
+                    if user_agent.is_empty() {
+                        user_agent = value.to_lowercase();
+                    }
+                }
+                "crawl-delay" => {
+                    if crawl_delay.is_none() {
+                        crawl_delay = value.parse::<u64>().ok();
+                    }
+                }
+                "disallow" => {
+                    if user_agent == "*" {
+                        disallow.push(value.to_lowercase());
+                    }
+                }
+                "allow" => {
+                    if user_agent == "*" {
+                        allow.push(value.to_lowercase());
+                    }
+                }
+                _ => {}
+            }
         }
 
-        let mut parts = line.splitn(2, ':');
-
-        let key = parts.next().expect("Failed to get key!").to_lowercase();
-        let value = parts.next().unwrap_or_default().trim();
-
-        match key.as_str() {
-            "user-agent" => {
-                if user_agent.is_empty() {
-                    user_agent = value.to_lowercase();
-                }
-            }
-            "crawl-delay" => {
-                if crawl_delay.is_none() {
-                    crawl_delay = value.parse::<u64>().ok();
-                }
-            }
-            "disallow" => {
-                if user_agent == "*" {
-                    disallow.push(value.to_lowercase());
-                }
-            }
-            "allow" => {
-                if user_agent == "*" {
-                    allow.push(value.to_lowercase());
-                }
-            }
-            _ => {}
+        RobotsFile {
+            crawl_delay,
+            disallow,
+            allow,
+            content: content.to_string(),
         }
-    }
-
-    RobotFile {
-        crawl_delay,
-        disallow,
-        allow,
-        content: content.to_string(),
     }
 }

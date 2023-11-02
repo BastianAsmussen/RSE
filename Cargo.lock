@@ -614,6 +614,7 @@ version = "0.1.0"
 dependencies = [
  "diesel",
  "reqwest",
+ "scraper",
  "serde",
  "thiserror",
  "url",
@@ -1550,13 +1551,9 @@ dependencies = [
  "env_logger",
  "error",
  "futures",
- "html5ever",
  "log",
- "regex",
  "reqwest",
- "rust-stemmers",
  "scraper",
- "serde",
  "tokio",
  "tokio-stream",
  "url",
@@ -1649,9 +1646,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scraper"
-version = "0.18.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3693f9a0203d49a7ba8f38aa915316b3d535c1862d03dae7009cb71a3408b36a"
+checksum = "585480e3719b311b78a573db1c9d9c4c1f8010c2dee4cc59c2efe58ea4dbc3e1"
 dependencies = [
  "ahash",
  "cssparser",
@@ -2214,7 +2211,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]

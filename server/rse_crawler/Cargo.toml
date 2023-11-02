@@ -24,13 +24,9 @@ tokio = { version = "1.33.0", features = ["full"] }
 # Crawler
 futures = "0.3.28"
 tokio-stream = "0.1.14"
-url = { version = "2.4.1", features = ["serde"] }
 
-# Spider
+# Scraper
+scraper = "0.18.1"
 async-trait = "0.1.74"
-serde = "1.0.190"
 reqwest = "0.11.22"
-regex = "1.10.1"
-scraper = "0.18.0"
-html5ever = "0.26.0"
-rust-stemmers = "1.2.0"
+url = "2.4.1"
