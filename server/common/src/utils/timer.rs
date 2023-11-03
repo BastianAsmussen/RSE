@@ -21,7 +21,7 @@ impl Timer {
     ///
     /// # Examples
     /// ```
-    /// use utils::timer::Timer;
+    /// use crate::common::utils::timer::Timer;
     ///
     /// let mut timer = Timer::new();
     ///
@@ -54,7 +54,7 @@ impl Timer {
     ///
     /// # Examples
     /// ```
-    /// use utils::timer::Timer;
+    /// use crate::common::utils::timer::Timer;
     ///
     /// let mut timer = Timer::new();
     ///
@@ -100,7 +100,7 @@ impl Default for Timer {
 ///
 /// # Examples
 /// ```
-/// use utils::timer::{format_time, Timer};
+/// use crate::common::utils::timer::{format_time, Timer};
 ///
 /// let mut timer = Timer::new();
 ///
