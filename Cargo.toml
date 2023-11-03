@@ -2,9 +2,7 @@
 resolver = "2"
 
 members = [
-    "server/common/database",
-    "server/common/errors",
-    "server/common/utils",
+    "server/common",
     "server/rse_server",
     "server/rse_crawler",
 ]

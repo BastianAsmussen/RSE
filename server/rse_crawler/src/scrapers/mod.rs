@@ -1,7 +1,7 @@
 pub mod web;
 
 use async_trait::async_trait;
-use error::Error;
+use common::errors::Error;
 use std::collections::HashMap;
 use url::Url;
 

@@ -8,17 +8,14 @@ edition = "2021"
 log = "0.4.20"
 env_logger = "0.10.0"
 
-# Error Handling
-error = { path = "../common/errors" }
+# Utilities
+common = { path = "../common" }
+rust-stemmers = "1.2.0"
 
 # Database
-database = { path = "../common/database" }
 diesel = "2.1.0"
-
-# Utilities
-utils = { path = "../common/utils" }
-rust-stemmers = "1.2.0"
 
 # Web Server
 actix-web = "4.4.0"
 serde = { version = "1.0.189", features = ["derive"] }
+

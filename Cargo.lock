@@ -356,6 +356,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "const_format",
+ "diesel",
+ "diesel-async",
+ "env_logger",
+ "log",
+ "regex",
+ "reqwest",
+ "rust-stemmers",
+ "scraper",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "const_format"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -457,19 +477,6 @@ checksum = "13b588ba4ac1a99f7f2964d24b3d896ddc6bf847ee3855dbd4366f058cfcd331"
 dependencies = [
  "quote",
  "syn 2.0.38",
-]
-
-[[package]]
-name = "database"
-version = "0.1.0"
-dependencies = [
- "diesel",
- "diesel-async",
- "env_logger",
- "error",
- "log",
- "serde",
- "url",
 ]
 
 [[package]]
@@ -606,18 +613,6 @@ checksum = "ac3e13f66a2f95e32a39eaa81f6b95d42878ca0e1db0c7543723dfe12557e860"
 dependencies = [
  "libc",
  "windows-sys",
-]
-
-[[package]]
-name = "error"
-version = "0.1.0"
-dependencies = [
- "diesel",
- "reqwest",
- "scraper",
- "serde",
- "thiserror",
- "url",
 ]
 
 [[package]]
@@ -1546,10 +1541,9 @@ name = "rse_crawler"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "database",
+ "common",
  "diesel",
  "env_logger",
- "error",
  "futures",
  "log",
  "reqwest",
@@ -1557,7 +1551,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "url",
- "utils",
 ]
 
 [[package]]
@@ -1565,14 +1558,12 @@ name = "rse_server"
 version = "0.1.0"
 dependencies = [
  "actix-web",
- "database",
+ "common",
  "diesel",
  "env_logger",
- "error",
  "log",
  "rust-stemmers",
  "serde",
- "utils",
 ]
 
 [[package]]
@@ -2218,22 +2209,6 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
-
-[[package]]
-name = "utils"
-version = "0.1.0"
-dependencies = [
- "const_format",
- "env_logger",
- "error",
- "log",
- "regex",
- "reqwest",
- "rust-stemmers",
- "serde",
- "serde_json",
- "serde_yaml",
-]
 
 [[package]]
 name = "vcpkg"

@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
 
-use error::Error;
+use crate::errors::Error;
 use log::info;
 use reqwest::Url;
 use serde::Deserialize;
