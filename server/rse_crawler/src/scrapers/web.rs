@@ -1,7 +1,8 @@
 use crate::robots::RobotsFile;
 use crate::scrapers::Scraper;
 use async_trait::async_trait;
-use error::Error;
+use common::errors::Error;
+use common::utils;
 use log::{debug, error, info, warn};
 use reqwest::Client;
 use scraper::{Html, Selector};
