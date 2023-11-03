@@ -4,6 +4,8 @@ use actix_web::App;
 use actix_web::HttpServer;
 use actix_web::Responder;
 use actix_web::{get, web};
+use common::errors::Error;
+use log::info;
 
 use crate::search::{Info, Output};
 
@@ -15,8 +17,8 @@ async fn handle_query(info: web::Query<Info>) -> impl Responder {
         Ok(search_results) => search_results,
         Err(err) => Output {
             query: info.query,
+            error: Some(Error::Internal(err.to_string())),
             pages: None,
-            error: Some(error::Error::Internal(err.to_string())),
         },
     };
 
@@ -27,8 +29,12 @@ async fn handle_query(info: web::Query<Info>) -> impl Responder {
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
+    let (ip, port) = common::utils::env::web::get_address();
+
+    info!("Starting web server...");
+    info!("Listening on \"http://{ip}:{port}\"...");
     HttpServer::new(|| App::new().service(handle_query))
-        .bind(("0.0.0.0", 8080))?
+        .bind((ip, port))?
         .run()
         .await
 }

@@ -1,24 +1,34 @@
-use crate::spiders::Spider;
+use crate::scrapers::Scraper;
 use futures::StreamExt;
 use log::{error, info};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Barrier};
+use tokio_stream::wrappers::ReceiverStream;
+use url::Url;
 
-/// A web crawler.
+/// The maximum number of items that can be in the queues at once. If it's exceeded, the control loop will exit.
+pub const SCRAPER_QUEUE_CAPACITY_MULTIPLIER: usize = 400;
+
+/// The maximum number of items that can be in the queues at once. If it's exceeded, the control loop will exit.
+pub const PROCESSOR_QUEUE_CAPACITY_MULTIPLIER: usize = 10;
+
+/// A crawler is responsible for orchestrating the crawling of URLs.
 ///
 /// # Fields
 ///
 /// * `delay`: The delay between requests.
-/// * `crawling_workers`: The number of concurrent crawlers.
-/// * `processing_workers`: The number of concurrent processors.
+///
+/// * `scraper_queue_capacity`: The maximum number of items that can be in the scraper queue at once.
+/// * `processor_queue_capacity`: The maximum number of items that can be in the processor queue at once.
 #[derive(Debug)]
 pub struct Crawler {
     delay: Duration,
-    crawling_workers: usize,
-    processing_workers: usize,
+
+    scraper_queue_capacity: usize,
+    processor_queue_capacity: usize,
 }
 
 impl Crawler {
@@ -27,13 +37,15 @@ impl Crawler {
     /// # Arguments
     ///
     /// * `delay` - The delay between requests.
-    /// * `crawling_workers` - The number of concurrent crawlers.
-    /// * `processing_workers` - The number of concurrent processors.
-    pub const fn new(delay: Duration, crawling_workers: usize, processing_workers: usize) -> Self {
+    ///
+    /// * `scrapers` - The number of scrapers running at once.
+    /// * `processors` - The number of processors running at once.
+    pub const fn new(delay: Duration, scrapers: usize, processors: usize) -> Self {
         Self {
             delay,
-            crawling_workers,
-            processing_workers,
+
+            scraper_queue_capacity: scrapers * SCRAPER_QUEUE_CAPACITY_MULTIPLIER,
+            processor_queue_capacity: processors * PROCESSOR_QUEUE_CAPACITY_MULTIPLIER,
         }
     }
 
@@ -41,91 +53,88 @@ impl Crawler {
     ///
     /// # Arguments
     ///
-    /// * `spider`: The spider to use.
-    pub async fn run<T: Send + 'static>(&self, spider: Arc<dyn Spider<Item = T>>) {
-        let mut visited_urls = HashSet::<String>::new();
+    /// * `scraper`: The scraper to use.
+    pub async fn run<T: Send + 'static>(&self, scraper: Arc<dyn Scraper<Item = T>>) {
+        let mut visited_urls = HashSet::<Url>::new();
 
-        let crawling_workers = self.crawling_workers;
-        let crawling_queue_capacity = crawling_workers * 400;
+        let active_scrapers = Arc::new(AtomicUsize::new(0));
 
-        let processing_workers = self.processing_workers;
-        let processing_queue_capacity = processing_workers * 10;
+        let (urls_to_visit_tx, urls_to_visit_rx) = mpsc::channel(self.scraper_queue_capacity);
+        let (items_tx, items_rx) = mpsc::channel(self.processor_queue_capacity);
+        let (new_urls_tx, mut new_urls_rx) = mpsc::channel(self.scraper_queue_capacity);
 
-        let active_spiders = Arc::new(AtomicUsize::new(0));
+        // Create a barrier to wait for the scrapers, processors, and new control loop to finish.
+        let barrier = Arc::new(Barrier::new(3));
 
-        let (urls_to_visit_tx, urls_to_visit_rx) = mpsc::channel(crawling_queue_capacity);
-        let (items_tx, items_rx) = mpsc::channel(processing_queue_capacity);
-        let (new_urls_tx, mut new_urls_rx) = mpsc::channel(crawling_queue_capacity);
-
-        let barrier = Arc::new(Barrier::new(3)); // 3 tasks: 1 for the control loop, 1 for the processors, 1 for the scrapers.
-
-        for url in spider.seed_urls() {
+        // Add the seed URLs to the queue.
+        for (url, depth) in scraper.seed_urls() {
             visited_urls.insert(url.clone());
 
-            let _ = urls_to_visit_tx.send(url).await;
+            let _ = urls_to_visit_tx
+                .send(HashMap::from([(url.clone(), depth)]))
+                .await;
         }
 
-        Self::launch_processors(
-            processing_workers,
-            spider.clone(),
-            items_rx,
-            barrier.clone(),
-        );
+        // Spawn the processors.
+        self.launch_processors(scraper.clone(), items_rx, barrier.clone());
 
-        Self::launch_scrapers(
-            crawling_workers,
-            spider.clone(),
+        // Spawn the scrapers.
+        self.launch_scrapers(
+            scraper.clone(),
             urls_to_visit_rx,
             new_urls_tx.clone(),
             items_tx,
-            active_spiders.clone(),
-            self.delay,
+            active_scrapers.clone(),
             barrier.clone(),
         );
 
+        // Start the control loop.
         loop {
-            if let Ok((visited_url, new_urls)) = new_urls_rx.try_recv() {
-                visited_urls.insert(visited_url);
+            let Ok((visited_url, new_urls)) = new_urls_rx.try_recv() else {
+                if new_urls_tx.capacity() == self.scraper_queue_capacity
+                    && urls_to_visit_tx.capacity() == self.scraper_queue_capacity
+                    && active_scrapers.load(Ordering::SeqCst) == 0
+                {
+                    break;
+                }
 
-                for url in new_urls {
-                    if visited_urls.contains(&url) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+
+                continue;
+            };
+
+            visited_urls.insert(visited_url);
+
+            for (url, depth) in new_urls {
+                if visited_urls.contains(&url) {
+                    continue;
+                }
+
+                // Retry sending the URL until it's successfully sent to the queue.
+                loop {
+                    if urls_to_visit_tx
+                        .send(HashMap::from([(url.clone(), depth)]))
+                        .await
+                        .is_err()
+                    {
+                        // Sleep for a short duration before retrying.
+                        tokio::time::sleep(Duration::from_millis(5)).await;
+
                         continue;
                     }
 
-                    // Retry sending the URL until it's successfully sent to the queue.
-                    loop {
-                        if urls_to_visit_tx.send(url.to_string()).await.is_err() {
-                            // Sleep for a short duration before retrying.
-                            tokio::time::sleep(Duration::from_millis(5)).await;
-
-                            continue;
-                        }
-
-                        // URL successfully sent, break the retry loop.
-                        break;
-                    }
-
-                    visited_urls.insert(url.to_string());
-                    info!("Queued URL: {url}");
+                    // URL successfully sent, break the retry loop.
+                    break;
                 }
-            }
 
-            // If the new_urls_tx is empty, the urls_to_visit_tx is empty, and there are no active spiders, we're finished.
-            if new_urls_tx.capacity() == 0
-                && urls_to_visit_tx.capacity() == 0
-                && active_spiders.load(Ordering::SeqCst) == 0
-            {
-                break;
+                visited_urls.insert(url.clone());
+                info!("Queued URL: {url}");
             }
-
-            tokio::time::sleep(Duration::from_millis(5)).await;
         }
 
-        info!("Control loop finished! Waiting for streams to complete...");
+        info!("Control loop finished, waiting for streams to complete...");
 
-        // Drop the transmitter in order to close the stream.
         drop(urls_to_visit_tx);
-        // Wait for the streams to complete.
         barrier.wait().await;
     }
 
@@ -133,20 +142,21 @@ impl Crawler {
     ///
     /// # Arguments
     ///
-    /// * `workers`: The number of concurrent processors.
-    /// * `spider`: The spider to use.
+    /// * `scraper`: The scraper to use.
     /// * `items`: The items to process.
-    /// * `barrier`: The barrier to wait on.
+    /// * `barrier`: The barrier to wait for.
     fn launch_processors<T: Send + 'static>(
-        workers: usize,
-        spider: Arc<dyn Spider<Item = T>>,
+        &self,
+        scraper: Arc<dyn Scraper<Item = T>>,
         items: mpsc::Receiver<T>,
         barrier: Arc<Barrier>,
     ) {
+        let processor_queue_capacity = self.processor_queue_capacity;
+
         tokio::spawn(async move {
-            tokio_stream::wrappers::ReceiverStream::new(items)
-                .for_each_concurrent(workers, |item| async {
-                    let _ = spider.process(item).await;
+            ReceiverStream::new(items)
+                .for_each_concurrent(processor_queue_capacity, |item| async {
+                    let _ = scraper.process(item).await;
                 })
                 .await;
 
@@ -158,42 +168,47 @@ impl Crawler {
     ///
     /// # Arguments
     ///
-    /// * `workers`: The number of concurrent scrapers.
-    /// * `spider`: The spider to use.
+    /// * `scraper`: The scraper to use.
     /// * `urls_to_visit`: The URLs to visit.
-    /// * `new_urls_tx`: The transmitter to send new URLs to.
-    /// * `items_tx`: The transmitter to send items to.
-    /// * `active_spiders`: The number of active spiders.
-    /// * `delay`: The delay between requests.
-    /// * `barrier`: The barrier to wait on.
-    #[allow(clippy::too_many_arguments)]
+    /// * `new_urls_tx`: The channel to send new URLs to.
+    /// * `items_tx`: The channel to send items to.
+    /// * `active_scrapers`: The number of active spiders.
+    /// * `barrier`: The barrier to wait for.
     fn launch_scrapers<T: Send + 'static>(
-        workers: usize,
-        spider: Arc<dyn Spider<Item = T>>,
-        urls_to_visit: mpsc::Receiver<String>,
-        new_urls_tx: mpsc::Sender<(String, Vec<String>)>,
+        &self,
+        scraper: Arc<dyn Scraper<Item = T>>,
+        urls_to_visit: mpsc::Receiver<HashMap<Url, u32>>,
+        new_urls_tx: mpsc::Sender<(Url, HashMap<Url, u32>)>,
         items_tx: mpsc::Sender<T>,
-        active_spiders: Arc<AtomicUsize>,
-        delay: Duration,
+        active_scrapers: Arc<AtomicUsize>,
         barrier: Arc<Barrier>,
     ) {
-        tokio::spawn(async move {
-            tokio_stream::wrappers::ReceiverStream::new(urls_to_visit)
-                .for_each_concurrent(workers, |queued_url| async {
-                    active_spiders.fetch_add(1, Ordering::SeqCst);
+        let scraper_queue_capacity = self.scraper_queue_capacity;
+        let delay = self.delay;
 
-                    let mut urls = Vec::new();
-                    let res = spider
-                        .scrape(queued_url.clone())
+        tokio::spawn(async move {
+            ReceiverStream::new(urls_to_visit)
+                .for_each_concurrent(scraper_queue_capacity, |queued_url| async {
+                    active_scrapers.fetch_add(1, Ordering::SeqCst); // Increment the number of active scrapers.
+
+                    let Some((url, depth)) = queued_url.into_iter().next() else {
+                        active_scrapers.fetch_sub(1, Ordering::SeqCst); // Decrement the number of active scrapers.
+
+                        return;
+                    };
+
+                    let mut urls = HashMap::new();
+                    let results = scraper
+                        .scrape(url.clone(), depth)
                         .await
                         .map_err(|err| {
-                            error!("Failed to scrape {queued_url}: {err}");
+                            error!("Failed to scrape {url}: {err}");
 
                             err
                         })
                         .ok();
 
-                    if let Some((items, new_urls)) = res {
+                    if let Some((items, new_urls)) = results {
                         for item in items {
                             let _ = items_tx.send(item).await;
                         }
@@ -201,10 +216,10 @@ impl Crawler {
                         urls = new_urls;
                     }
 
-                    let _ = new_urls_tx.send((queued_url, urls)).await;
+                    let _ = new_urls_tx.send((url.clone(), urls)).await;
 
                     tokio::time::sleep(delay).await;
-                    active_spiders.fetch_sub(1, Ordering::SeqCst);
+                    active_scrapers.fetch_sub(1, Ordering::SeqCst);
                 })
                 .await;
 

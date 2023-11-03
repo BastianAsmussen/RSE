@@ -10,6 +10,9 @@ const DEFAULT_HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 /// The default user agent.
 const DEFAULT_USER_AGENT: &str = formatcp!("RSE/{}", env!("CARGO_PKG_VERSION"));
 
+/// The default maximum depth.
+const DEFAULT_MAX_DEPTH: Option<u32> = None;
+
 /// The default minimum word frequency.
 const DEFAULT_MINIMUM_WORD_FREQUENCY: usize = 1;
 
@@ -97,6 +100,36 @@ pub fn get_word_boundaries() -> (usize, usize, usize, usize) {
         get_maximum_word_frequency(),
         get_minimum_word_length(),
         get_maximum_word_length(),
+    )
+}
+
+/// Gets the maximum depth.
+///
+/// # Returns
+///
+/// * `Option<u32>` - The maximum depth.
+///
+/// # Panics
+///
+/// * If `MAX_DEPTH` is not valid UTF-8.
+/// * If `MAX_DEPTH` is not a valid number.
+#[must_use]
+#[allow(clippy::expect_used)]
+pub fn get_max_depth() -> Option<u32> {
+    env::var_os("MAX_DEPTH").map_or_else(
+        || {
+            warn!("MAX_DEPTH is not set! Using default value of {DEFAULT_MAX_DEPTH:?}...",);
+
+            DEFAULT_MAX_DEPTH
+        },
+        |max_depth| {
+            max_depth
+                .to_str()
+                .expect("MAX_DEPTH must be valid UTF-8!")
+                .parse::<u32>()
+                .expect("MAX_DEPTH must be a valid number!")
+                .into()
+        },
     )
 }
 

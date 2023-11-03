@@ -1,7 +1,7 @@
-use crate::model::{ForwardLink, Keyword, NewForwardLink, NewKeyword, NewPage, Page};
+use crate::database::model::{ForwardLink, Keyword, NewForwardLink, NewKeyword, NewPage, Page};
+use crate::errors::Error;
 use diesel::{ConnectionResult, ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
-use error::Error;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::RandomState;
@@ -58,7 +58,7 @@ pub async fn create_page(
     title: Option<&str>,
     description: Option<&str>,
 ) -> Result<Page, Error> {
-    use crate::schema::pages::dsl::pages;
+    use crate::database::schema::pages::dsl::pages;
 
     if let Some(page) = get_page_by_url(conn, url).await? {
         info!("Page already exists: {}", url.to_string());
@@ -96,8 +96,8 @@ pub async fn create_page(
 ///
 /// * If the pages could not be retrieved.
 pub async fn get_oldest_pages(limit: i64) -> Result<Vec<Page>, Error> {
-    use crate::schema::pages::dsl::pages;
-    use crate::schema::pages::last_crawled_at;
+    use crate::database::schema::pages::dsl::pages;
+    use crate::database::schema::pages::last_crawled_at;
 
     let Ok(mut conn) = get_connection().await else {
         return Err(Error::Database("Failed to get database connection!".into()));
@@ -129,7 +129,7 @@ pub async fn create_keywords(
     conn: &mut AsyncPgConnection,
     data: &[NewKeyword],
 ) -> Result<(), diesel::result::Error> {
-    use crate::schema::keywords::dsl::keywords;
+    use crate::database::schema::keywords::dsl::keywords;
 
     diesel::insert_into(keywords)
         .values(data)
@@ -164,7 +164,7 @@ where
     S: std::hash::BuildHasher + Send + Sync,
     RandomState: std::hash::BuildHasher,
 {
-    use crate::schema::forward_links::dsl::forward_links;
+    use crate::database::schema::forward_links::dsl::forward_links;
 
     // Get the page we're creating forward links for.
     let Some(from_page) = get_page_by_url(conn, from_page_url).await? else {
@@ -224,8 +224,8 @@ pub async fn get_page_by_id(
     conn: &mut AsyncPgConnection,
     page_id: i32,
 ) -> Result<Option<Page>, Error> {
-    use crate::schema::pages::dsl::pages;
-    use crate::schema::pages::id;
+    use crate::database::schema::pages::dsl::pages;
+    use crate::database::schema::pages::id;
 
     Ok(pages
         .filter(id.eq(page_id))
@@ -255,7 +255,7 @@ pub async fn get_page_by_url(
     conn: &mut AsyncPgConnection,
     url: &Url,
 ) -> Result<Option<Page>, Error> {
-    use crate::schema::pages::dsl::{pages, url as url_column};
+    use crate::database::schema::pages::dsl::{pages, url as url_column};
 
     Ok(pages
         .filter(url_column.eq(url.to_string()))
@@ -291,7 +291,7 @@ pub async fn get_keywords_by_page_id(
     conn: &mut AsyncPgConnection,
     page_id: i32,
 ) -> Result<Option<Vec<Keyword>>, diesel::result::Error> {
-    use crate::schema::keywords::dsl::{keywords, page_id as page_id_column};
+    use crate::database::schema::keywords::dsl::{keywords, page_id as page_id_column};
 
     keywords
         .filter(page_id_column.eq(page_id))
@@ -321,8 +321,8 @@ pub async fn get_pages_with_words(
     conn: &mut AsyncPgConnection,
     words: Vec<String>,
 ) -> Result<Option<Vec<Page>>, Error> {
-    use crate::schema::keywords::dsl::keywords;
-    use crate::schema::pages::dsl::pages;
+    use crate::database::schema::keywords::dsl::keywords;
+    use crate::database::schema::pages::dsl::pages;
 
     // Search for pages that contain the words in their keywords.
     let pages_with_keywords = keywords
@@ -390,8 +390,8 @@ pub async fn get_backlinks(
     conn: &mut AsyncPgConnection,
     page: &CompletePage,
 ) -> Result<Vec<CompletePage>, Error> {
-    use crate::schema::forward_links::dsl::forward_links;
-    use crate::schema::pages::dsl::pages;
+    use crate::database::schema::forward_links::dsl::forward_links;
+    use crate::database::schema::pages::dsl::pages;
 
     let mut backlinks = Vec::new();
 

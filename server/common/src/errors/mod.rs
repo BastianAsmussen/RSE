@@ -16,6 +16,7 @@ use thiserror::Error;
 /// * `Database`: A database error.
 /// * `NumberParseError`: A number parse error.
 /// * `Query`: A query error.
+/// * `Queue`: A queue error.
 #[derive(Error, Serialize, Debug, Clone)]
 pub enum Error {
     #[error("Internal")]
@@ -32,8 +33,14 @@ pub enum Error {
     Database(String),
     #[error("Parse Error: {0}")]
     NumberParseError(String),
-    #[error("Query: {0}")]
+    #[error("Query Error: {0}")]
     Query(String),
+    #[error("Queue Error: {0}")]
+    Queue(String),
+    #[error("Selector Error: {0}")]
+    Selector(String),
+    #[error("Read/Write Error: {0}")]
+    ReadWrite(String),
 }
 
 impl From<io::Error> for Error {
@@ -69,5 +76,23 @@ impl From<ConnectionError> for Error {
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
         Self::NumberParseError(err.to_string())
+    }
+}
+
+impl From<&str> for Error {
+    fn from(err: &str) -> Self {
+        Self::Queue(err.to_string())
+    }
+}
+
+impl From<scraper::error::SelectorErrorKind<'_>> for Error {
+    fn from(err: scraper::error::SelectorErrorKind) -> Self {
+        Self::Selector(err.to_string())
+    }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for Error {
+    fn from(err: std::sync::PoisonError<T>) -> Self {
+        Self::ReadWrite(err.to_string())
     }
 }

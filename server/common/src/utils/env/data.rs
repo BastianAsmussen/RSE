@@ -3,9 +3,11 @@ use serde_yaml::Value;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::str::FromStr;
 
-use error::Error;
+use crate::errors::Error;
 use log::info;
+use reqwest::Url;
 use serde::Deserialize;
 
 /// 1 MB as bytes.
@@ -200,14 +202,19 @@ impl<'a> SeedURLReader<'a> {
         SeedURLReader { strategy }
     }
 
-    fn read_seed_urls_from_file<T>(
-        &self,
-        file_path: T,
-    ) -> Result<Option<Vec<String>>, std::io::Error>
+    fn read_seed_urls_from_file<T>(&self, file_path: T) -> Result<Option<Vec<Url>>, std::io::Error>
     where
         T: AsRef<Path>,
     {
-        read_data_from_file(file_path, |content| self.strategy.read_seed_urls(content))
+        read_data_from_file(file_path, |content| self.strategy.read_seed_urls(content)).map(
+            |urls| {
+                urls.map(|urls| {
+                    urls.into_iter()
+                        .filter_map(|url| Url::from_str(&url).ok())
+                        .collect()
+                })
+            },
+        )
     }
 }
 
@@ -254,7 +261,7 @@ impl<'a> StopWordsReader<'a> {
 /// * If `SEED_URLS` is not set.
 /// * If `SEED_URLS` is not valid UTF-8.
 #[allow(clippy::expect_used)]
-pub fn fetch_seed_urls() -> Result<Vec<String>, Error> {
+pub fn fetch_seed_urls() -> Result<Vec<Url>, Error> {
     // Load the file path from the environment variable.
     let file_path = std::env::var_os("SEED_URLS")
         .expect("SEED_URLS must be set!")

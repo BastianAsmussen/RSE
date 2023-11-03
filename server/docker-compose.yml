@@ -14,7 +14,7 @@ services:
       - '80:8080'
     networks:
       backend:
-        ipv4_address: 10.5.0.3
+        ipv4_address: 1.0.0.4
       frontend:
   rse_crawler:
     build:
@@ -27,7 +27,7 @@ services:
       - 'database'
     networks:
       backend:
-        ipv4_address: 10.5.0.4
+        ipv4_address: 1.0.0.3
   database:
     image: postgres:16.0
     container_name: rse_database
@@ -42,14 +42,14 @@ services:
       - '5432:5432'
     networks:
       backend:
-        ipv4_address: 10.5.0.2
+        ipv4_address: 1.0.0.2
 
 networks:
   backend:
     driver: bridge
     ipam:
       config:
-        - subnet: 10.5.0.0/16
-          gateway: 10.5.0.1
+        - subnet: 1.0.0.0/29
+          gateway: 1.0.0.1
   frontend:
     driver: bridge

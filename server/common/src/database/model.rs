@@ -13,7 +13,7 @@ use std::time::SystemTime;
 #[derive(
     Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Queryable, Selectable, Insertable,
 )]
-#[diesel(table_name = crate::schema::pages)]
+#[diesel(table_name = crate::database::schema::pages)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Page {
     pub id: i32,
@@ -34,7 +34,7 @@ pub struct Page {
 /// * `title`: The title of the page.
 /// * `description`: The description of the page.
 #[derive(Debug, Clone, Insertable)]
-#[diesel(table_name = crate::schema::pages)]
+#[diesel(table_name = crate::database::schema::pages)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewPage {
     pub url: String,
@@ -53,7 +53,7 @@ pub struct NewPage {
 /// * `word`: The word of the keyword.
 /// * `frequency`: The frequency of the keyword.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Queryable, Selectable)]
-#[diesel(table_name = crate::schema::keywords)]
+#[diesel(table_name = crate::database::schema::keywords)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Keyword {
     pub id: i32,
@@ -72,7 +72,7 @@ pub struct Keyword {
 /// * `word`: The word of the keyword.
 /// * `frequency`: The frequency of the keyword.
 #[derive(Debug, Insertable)]
-#[diesel(table_name = crate::schema::keywords)]
+#[diesel(table_name = crate::database::schema::keywords)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewKeyword {
     pub page_id: i32,
@@ -91,7 +91,7 @@ pub struct NewKeyword {
 ///
 /// * `frequency`: The frequency of the forward link.
 #[derive(Debug, Queryable, Selectable, Insertable)]
-#[diesel(table_name = crate::schema::forward_links)]
+#[diesel(table_name = crate::database::schema::forward_links)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ForwardLink {
     pub from_page_id: i32,
@@ -110,7 +110,7 @@ pub struct ForwardLink {
 /// * `to_page_url`: The URL of the page the forward link points to.
 /// * `frequency`: The frequency of the forward link.
 #[derive(Debug, Queryable, Selectable, Insertable)]
-#[diesel(table_name = crate::schema::forward_links)]
+#[diesel(table_name = crate::database::schema::forward_links)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ForwardLink {
     pub from_page_id: i32,
@@ -129,7 +129,7 @@ pub struct ForwardLink {
 ///
 /// * `frequency`: The frequency of the forward link.
 #[derive(Debug, Insertable)]
-#[diesel(table_name = crate::schema::forward_links)]
+#[diesel(table_name = crate::database::schema::forward_links)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewForwardLink {
     pub from_page_id: i32,
@@ -148,7 +148,7 @@ pub struct NewForwardLink {
 /// * `to_page_url`: The URL of the page the forward link points to.
 /// * `frequency`: The frequency of the forward link.
 #[derive(Debug, Insertable)]
-#[diesel(table_name = crate::schema::forward_links)]
+#[diesel(table_name = crate::database::schema::forward_links)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewForwardLink {
     pub from_page_id: i32,

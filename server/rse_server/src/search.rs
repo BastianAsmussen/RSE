@@ -1,5 +1,6 @@
-use database::CompletePage;
-use error::Error;
+use common::database::CompletePage;
+use common::errors::Error;
+use common::{database, utils};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -158,11 +159,11 @@ impl Info {
 /// # Fields
 ///
 /// * `query`: The query, if any.
-/// * `pages`: The pages that match the query, if any.
 /// * `errors`: An errors, if any.
+/// * `pages`: The pages that match the query, if any.
 #[derive(Debug, Serialize)]
 pub struct Output {
     pub query: Option<String>,
-    pub pages: Option<Vec<CompletePage>>,
     pub error: Option<Error>,
+    pub pages: Option<Vec<CompletePage>>,
 }

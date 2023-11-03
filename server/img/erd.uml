@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Diagram>
+  <ID>DATABASE</ID>
+  <OriginalElement>22f1efcf-a414-48cb-8122-1b2cd868ba28</OriginalElement>
+  <nodes>
+    <node x="30.0" y="150.0">22f1efcf-a414-48cb-8122-1b2cd868ba28.TABLE:rse.public.forward_links</node>
+    <node x="-66.0" y="-86.0">22f1efcf-a414-48cb-8122-1b2cd868ba28.TABLE:rse.public.pages</node>
+    <node x="-136.0" y="136.0">22f1efcf-a414-48cb-8122-1b2cd868ba28.TABLE:rse.public.keywords</node>
+  </nodes>
+  <notes />
+  <edges>
+    <edge source="22f1efcf-a414-48cb-8122-1b2cd868ba28.TABLE:rse.public.forward_links" target="22f1efcf-a414-48cb-8122-1b2cd868ba28.TABLE:rse.public.pages" relationship="REFERENCES">
+      <point x="0.0" y="-58.0" />
+      <point x="127.0" y="111.0" />
+      <point x="81.0" y="111.0" />
+      <point x="49.0" y="86.0" />
+    </edge>
+    <edge source="22f1efcf-a414-48cb-8122-1b2cd868ba28.TABLE:rse.public.keywords" target="22f1efcf-a414-48cb-8122-1b2cd868ba28.TABLE:rse.public.pages" relationship="REFERENCES">
+      <point x="0.0" y="-72.0" />
+      <point x="-63.0" y="111.0" />
+      <point x="-17.0" y="111.0" />
+      <point x="-49.0" y="86.0" />
+    </edge>
+  </edges>
+  <settings layout="Hierarchic" zoom="1.3860103626943006" showDependencies="false" x="54.0" y="154.98317757009346" />
+  <SelectedNodes />
+  <Categories>
+    <Category>Columns</Category>
+    <Category>Comments</Category>
+    <Category>Key columns</Category>
+    <Category>Virtual foreign keys</Category>
+  </Categories>
+</Diagram>
+
