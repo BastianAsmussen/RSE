@@ -1,6 +1,7 @@
 use crate::robots::RobotsFile;
 use crate::scrapers::Scraper;
 use async_trait::async_trait;
+use common::database::model::NewKeyword;
 use common::errors::Error;
 use common::{database, utils};
 use html5ever::tree_builder::TreeSink;
@@ -12,7 +13,6 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::RwLock;
 use url::Url;
-use common::database::model::NewKeyword;
 
 /// A scraper for websites.
 ///
@@ -223,11 +223,7 @@ impl Scraper for Web {
         let language = Website::get_language(&item.html);
         let keywords = Website::get_keywords(&item.html);
         let words = Website::get_words(&item.html, language.as_deref(), self.word_boundaries)?;
-        let link_count = item
-            .links
-            .as_ref()
-            .map(Vec::len)
-            .unwrap_or_default();
+        let link_count = item.links.as_ref().map(Vec::len).unwrap_or_default();
 
         debug!("=> Title: {title:?}");
         debug!("=> Description: {description:?}");
@@ -245,7 +241,7 @@ impl Scraper for Web {
             title.as_deref(),
             description.as_deref(),
         )
-            .await?;
+        .await?;
 
         let mut forward_links = HashMap::new();
         for link in item.links.unwrap_or_else(|| {
@@ -271,12 +267,10 @@ impl Scraper for Web {
 
         let keywords = words
             .into_iter()
-            .map(|(word, frequency)| {
-                NewKeyword {
-                    page_id: page.id,
-                    word,
-                    frequency: i32::try_from(frequency).expect("=> Failed to convert frequency!"),
-                }
+            .map(|(word, frequency)| NewKeyword {
+                page_id: page.id,
+                word,
+                frequency: i32::try_from(frequency).expect("=> Failed to convert frequency!"),
             })
             .collect::<Vec<_>>();
         info!(
