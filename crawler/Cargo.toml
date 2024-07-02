@@ -1,0 +1,11 @@
+[package]
+name = "crawler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.38.0", features = ["full"] }
+anyhow = "1.0.86"
+
+reqwest = "0.12.5"
+scraper = "0.19.0"
