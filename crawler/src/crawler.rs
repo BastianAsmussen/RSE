@@ -1,17 +1,21 @@
+use std::sync::mpsc::Sender;
+
 use anyhow::Result;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
 #[derive(Debug)]
 pub struct Crawler {
+    sender: Sender<Url>,
     url: Url,
     body: Option<String>,
     found_links: Option<Vec<Url>>,
 }
 
 impl Crawler {
-    pub const fn new(url: Url) -> Self {
+    pub const fn new(sender: Sender<Url>, url: Url) -> Self {
         Self {
+            sender,
             url,
             body: None,
             found_links: None,
@@ -30,6 +34,10 @@ impl Crawler {
         let body = reqwest::get(self.url.as_str()).await?.text().await?;
         let found_links = self.find_links(&body);
 
+        for link in found_links.clone() {
+            self.sender.send(link)?;
+        }
+
         self.body = Some(body);
         self.found_links = Some(found_links);
 
@@ -43,16 +51,20 @@ impl Crawler {
         let mut links = Vec::new();
         for element in document.select(&anchors) {
             // If the element has no href, skip it.
-            let Some(path) = element.value().attr("href") else {
+            let Some(url) = element.value().attr("href") else {
                 continue;
             };
 
-            let mut url = self.url.clone();
-            url.set_path(path);
+            let Ok(url) = Url::parse(url) else {
+                continue;
+            };
+
+            let mut new_url = self.url.clone();
+            new_url.set_path(url.path());
 
             // Make sure we only check HTTP(s) sites.
-            match url.scheme() {
-                "http" | "https" => links.push(url),
+            match new_url.scheme() {
+                "http" | "https" => links.push(new_url),
                 _ => continue,
             }
         }
