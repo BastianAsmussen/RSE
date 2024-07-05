@@ -44,6 +44,43 @@ impl Crawler {
         Ok(())
     }
 
+    async fn is_crawlable(&self) -> Result<()> {
+        let robots_url = {
+            let mut url = self.url.clone();
+            url.set_path("/robots.txt");
+            url
+        };
+
+        let body = reqwest::get(robots_url).await?.text().await?;
+        for line in body.lines() {
+            let mut user_agent = String::new();
+            let mut crawl_delay = None;
+
+            let mut allowed_sites = Vec::new();
+            let mut disallowed_sites = Vec::new();
+
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            let mut parts = line.splitn(2, ':');
+            let (Some(key), Some(value)) = (parts.next(), parts.next()) else {
+                continue;
+            };
+
+            match key {
+                "user-agent" => user_agent = value.to_lowercase(),
+                "crawl-delay" => crawl_delay = value.parse::<u16>().ok(),
+                "allow" => allowed_sites.push(value.to_lowercase()),
+                "disallow" => disallowed_sites.push(value.to_lowercase()),
+                _ => {}
+            };
+        }
+
+        Ok(())
+    }
+
     fn find_links(&self, body: &str) -> Vec<Url> {
         let document = Html::parse_document(body);
         let anchors = Selector::parse("a").expect("Failed to create anchor tag selector!");
