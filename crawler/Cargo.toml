@@ -6,6 +6,16 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
 anyhow = "1.0.86"
+dotenvy = "0.15.7"
+
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+
+diesel = { version = "2.1.6", default-features = false, features = ["postgres", "chrono"] }
+diesel-async = { version = "0.4.1", features = ["bb8", "postgres"] }
+diesel_migrations = "2.1.0"
+
+chrono = { version = "0.4.38", features = ["serde"] }
 
 reqwest = "0.12.5"
 scraper = "0.19.0"
