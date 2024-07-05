@@ -1,0 +1,75 @@
+services:
+  server:
+    build:
+      context: .
+      target: final
+    ports:
+      - 8080:8080
+    depends_on:
+      db:
+        condition: service_healthy
+      crawler-cache:
+        condition: service_healthy
+    networks:
+      backend:
+        ipv4_address: 10.0.0.4
+
+  db:
+    image: postgres:16.3
+    restart: always
+    user: postgres
+    secrets:
+      - db-password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=rse
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      backend:
+        ipv4_address: 10.0.0.2
+
+  crawler-cache:
+    image: valkey/valkey:7.2.5
+    restart: always
+    user: valkey
+    volumes:
+      - db-data:/var/lib/valkey/6379
+    environment:
+     - VALKEY_DATABASE=crawler_cache
+    env_file:
+        - ./secrets/crawler_cache.env
+    expose:
+      - 6379
+    healthcheck:
+      test: [ "CMD", "valkey-server", "--check-sytem" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      backend:
+        ipv4_address: 10.0.0.3
+
+volumes:
+  db-data:
+
+secrets:
+  db-password:
+    file: secrets/db-password.txt
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.0.0/29
+          gateway: 10.0.0.1
+  frontend:
+    driver: bridge
