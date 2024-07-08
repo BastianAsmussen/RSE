@@ -10,6 +10,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let db = db::init().await.expect("Failed to connect to database!");
+    println!("Connected to database!");
 
     Ok(())
 }

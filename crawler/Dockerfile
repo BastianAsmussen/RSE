@@ -24,6 +24,11 @@ cp ./target/release/$APP_NAME /bin/server
 
 FROM debian:bookworm-slim AS final
 
+# Install runtime dependencies.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql \
+    && rm -rf /var/lib/apt/lists/*
+
 ARG UID=10001
 RUN adduser \
     --disabled-password \

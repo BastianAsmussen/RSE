@@ -5,10 +5,10 @@ services:
       target: final
     ports:
       - 8080:8080
+    env_file:
+      - ./.env
     depends_on:
       db:
-        condition: service_healthy
-      crawler-cache:
         condition: service_healthy
     networks:
       backend:
@@ -48,11 +48,6 @@ services:
         - ./secrets/crawler_cache.env
     expose:
       - 6379
-    healthcheck:
-      test: [ "CMD", "valkey-server", "--check-sytem" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       backend:
         ipv4_address: 10.0.0.3
