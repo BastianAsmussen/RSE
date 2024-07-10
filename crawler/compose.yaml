@@ -37,17 +37,23 @@ services:
         ipv4_address: 10.0.0.2
 
   crawler-cache:
-    image: valkey/valkey:7.2.5
+    image: redis:7.2.5-alpine
     restart: always
-    user: valkey
     volumes:
-      - db-data:/var/lib/valkey/6379
-    environment:
-     - VALKEY_DATABASE=crawler_cache
+      - db-data:/var/lib/redis
     env_file:
-        - ./secrets/crawler_cache.env
+      - ./secrets/crawler_cache.env
     expose:
       - 6379
+    command:
+      - /bin/sh
+      - -c
+      - redis-server --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD variable is not set!}"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       backend:
         ipv4_address: 10.0.0.3
