@@ -12,6 +12,7 @@
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
+		"@catppuccin/tailwindcss": "^0.1.6",
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
@@ -20,6 +21,8 @@
 		"eslint": "^9.0.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.36.0",
+		"flowbite": "^2.4.1",
+		"flowbite-svelte": "^0.46.14",
 		"globals": "^15.0.0",
 		"postcss": "^8.4.39",
 		"prettier": "^3.1.1",
