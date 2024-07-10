@@ -3,6 +3,7 @@ use std::sync::mpsc::Sender;
 use anyhow::Result;
 use reqwest::Url;
 use scraper::{Html, Selector};
+use tracing::info;
 
 #[derive(Debug)]
 pub struct Crawler {
@@ -31,6 +32,12 @@ impl Crawler {
     }
 
     pub async fn crawl(&mut self) -> Result<()> {
+        if self.is_crawlable().await.is_ok_and(|is_crawlable| !is_crawlable) {
+            info!("{} isn't crawlable.", self.url);
+
+            return Ok(());
+        }
+
         let body = reqwest::get(self.url.as_str()).await?.text().await?;
         let found_links = self.find_links(&body);
 
@@ -44,7 +51,7 @@ impl Crawler {
         Ok(())
     }
 
-    async fn is_crawlable(&self) -> Result<()> {
+    async fn is_crawlable(&self) -> Result<bool> {
         let robots_url = {
             let mut url = self.url.clone();
             url.set_path("/robots.txt");
@@ -78,7 +85,7 @@ impl Crawler {
             };
         }
 
-        Ok(())
+        Ok(true)
     }
 
     fn find_links(&self, body: &str) -> Vec<Url> {
