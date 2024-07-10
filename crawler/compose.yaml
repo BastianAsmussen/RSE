@@ -10,6 +10,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      cache:
+        condition: service_healthy
     networks:
       backend:
         ipv4_address: 10.0.0.4
@@ -36,13 +38,13 @@ services:
       backend:
         ipv4_address: 10.0.0.2
 
-  crawler-cache:
+  cache:
     image: redis:7.2.5-alpine
     restart: always
     volumes:
       - db-data:/var/lib/redis
     env_file:
-      - ./secrets/crawler_cache.env
+      - ./secrets/cache.env
     expose:
       - 6379
     command:

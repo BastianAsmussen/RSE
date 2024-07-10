@@ -17,5 +17,7 @@ diesel_migrations = "2.1.0"
 
 chrono = { version = "0.4.38", features = ["serde"] }
 
+redis = { version = "0.25.4", features = ["tokio-comp"] }
+
 reqwest = "0.12.5"
 scraper = "0.19.0"
