@@ -36,6 +36,7 @@ metadata:
 spec:
   selector:
     app: api
+    type: NodePort
   ports:
     - protocol: TCP
       port: 80
