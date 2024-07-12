@@ -9,7 +9,13 @@ docker build -t crawler:latest ./src/crawler
 docker build -t api:latest ./src/api
 ```
 
-2. Deploy to Kubernetes.
+2. Create the namespace.
+
+```sh
+kubectl create namespace gse
+```
+
+3. Deploy to Kubernetes.
 
 ```sh
 kubectl apply -f postgres-deployment.yaml
