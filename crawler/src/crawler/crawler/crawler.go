@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -252,4 +253,3 @@ func isValidURL(link string) bool {
 
 	return true
 }
-

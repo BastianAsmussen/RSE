@@ -1,10 +1,9 @@
-package main
+package crawler
 
 import (
-	"log"
 	"os"
 
-	"crawler"
+	"asmussen.tech/crawler/crawler"
 )
 
 func main() {
@@ -14,4 +13,3 @@ func main() {
 	c := crawler.NewCrawler(redisAddr, pgConnStr)
 	c.StartCrawling()
 }
-
