@@ -1,3 +1,4 @@
-# RSE (Rust Search Engine)
+# GSE (Go Search Engine)
 
-It's a search engine I've written in Rust all by myself.
+It's a search engine I've written in Go.
+
