@@ -38,28 +38,6 @@ services:
       backend:
         ipv4_address: 10.0.0.2
 
-  cache:
-    image: redis:7.2.5-alpine
-    restart: always
-    volumes:
-      - db-data:/var/lib/redis
-    env_file:
-      - ./secrets/cache.env
-    expose:
-      - 6379
-    command:
-      - /bin/sh
-      - -c
-      - redis-server --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD variable is not set!}"
-    healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      backend:
-        ipv4_address: 10.0.0.3
-
 volumes:
   db-data:
 

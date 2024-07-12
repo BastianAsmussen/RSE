@@ -1,13 +1,11 @@
-use std::sync::mpsc::channel;
-
 use anyhow::Result;
-use crawler::Crawler;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
+
+use spider::{configuration::Configuration, website::Website};
+
+use tokio::time::Instant;
 
 mod db;
-mod cache;
-
-mod crawler;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -15,28 +13,22 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let db = db::init().await?;
-    let cache = cache::init()?;
+    info!("Connected to database!");
 
-    let (sender, reciever) = channel();
-    let mut conn = cache.get_connection()?;
-    tokio::spawn(async move {
-        loop {
-            let Ok(url) = reciever.recv() else {
-                continue;
-            };
+    let config = Configuration::new().with_respect_robots_txt(true).build();
 
-            match cache::add_website(&mut conn, &url) {
-                Ok(()) => info!("Added {url} to crawl list."),
-                Err(why) => warn!("Failed to add {url} to crawl list: {why}"),
-            };
-        }
-    });
+    let mut to_crawl = vec![String::from("https://www.wikipedia.org/")];
+    for url in &to_crawl {
+        let mut website = Website::new(&url).with_config(config.to_owned()).build()?;
+        website.crawl().await;
 
-    info!("Connected to databases!");
-    while let Some(url) = cache::next_website(&mut cache.get_connection()?)? {
-        info!("crawlin...");
-        let mut crawler = Crawler::new(sender.clone(), url);
-        crawler.crawl().await?;
+        to_crawl.extend(
+            website
+                .get_links()
+                .iter()
+                .map(|link| link.inner().to_string())
+                .collect::<Vec<_>>(),
+        );
     }
 
     Ok(())
