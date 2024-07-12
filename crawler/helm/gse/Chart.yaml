@@ -1,6 +1,0 @@
-apiVersion: v2
-name: GSE
-description: A Helm chart for deploying a Go crawler with Redis.
-version: 0.1.0
-appVersion: "1.0"
-

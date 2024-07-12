@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gse
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: gse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: api:latest
+        imagePullPolicy: Never
+        env:
+        - name: POSTGRES_CONN
+          value: "postgresql://postgres:toor@postgres:5432/gse"
+        ports:
+        - containerPort: 8080
+

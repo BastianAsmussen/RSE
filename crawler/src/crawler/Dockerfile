@@ -37,5 +37,5 @@ USER appuser
 # Copy the Go binary from the build stage.
 COPY --from=build /bin/server /bin/
 
-EXPOSE 8080
+EXPOSE 3000
 CMD ["/bin/server"]
